@@ -273,81 +273,103 @@
         </main>
     </div>
 
-    <script>
-        // --- FUNÇÕES DE UI (CORRIGIDO PARA LAYOUT HORIZONTAL) ---
+   <script>
+        // --- FUNÇÕES DE RENDERIZAÇÃO (CARDS DESIGN) ---
+
         function renderGrupos() {
             const ui = document.getElementById('listaGruposUI');
-            if(!cache.grupos.length) { ui.innerHTML = '<div style="text-align:center; padding:40px; color:#555;">Nenhum grupo.</div>'; return; }
+            // Adicionamos a classe grid-container
+            ui.className = 'grid-container'; 
             
-            ui.innerHTML = cache.grupos.map(g => `
-                <div class="list-item">
-                    <div class="item-left">
-                        <div class="item-icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            if(!cache.grupos.length) { 
+                ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum grupo criado.</div>'; 
+                return; 
+            }
+            
+            ui.innerHTML = cache.grupos.map((g, index) => {
+                // Alterna estilos para dar vida (igual a ref)
+                const isHighlight = index === 0; // O primeiro destaque
+                const cardClass = isHighlight ? 'dashboard-card highlight' : 'dashboard-card';
+                const pillClass = isHighlight ? 'pill yellow' : 'pill dark';
+                
+                return `
+                <div class="${cardClass}">
+                    <div class="card-top">
+                        <div class="card-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                         </div>
-                        <div class="item-info">
-                            <strong>${g.nome}</strong>
-                            <small>${g.emails ? g.emails.length : 0} contatos</small>
+                        <div class="card-actions">
+                            <button class="icon-btn" onclick="window.editarGrupo(${g.id})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                            <button class="icon-btn delete" onclick="window.deletarGrupo(${g.id})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                         </div>
                     </div>
-                    <div class="item-actions">
-                        <button class="action-btn" onclick="window.editarGrupo(${g.id})">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                        <button class="action-btn delete" onclick="window.deletarGrupo(${g.id})">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                        </button>
+                    <div class="card-content">
+                        <h3>${g.nome}</h3>
+                        <p>${g.emails ? g.emails.length : 0} contatos ativos</p>
+                        <div class="card-tags">
+                            <span class="${pillClass}">ATIVO</span>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
 
         function renderTemplates() {
             const ui = document.getElementById('listaTemplatesUI');
-            if(!cache.templates.length) { ui.innerHTML = '<div style="text-align:center; padding:40px; color:#555;">Nenhum template.</div>'; return; }
+            ui.className = 'grid-container';
 
-            ui.innerHTML = cache.templates.map(t => `
-                <div class="list-item">
-                    <div class="item-left">
-                        <div class="item-icon" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa;">
+            if(!cache.templates.length) { ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum template.</div>'; return; }
+
+            ui.innerHTML = cache.templates.map((t, index) => {
+                // Alterna gradientes para diferenciar
+                const isHighlight = index === 1; 
+                const cardStyle = isHighlight ? 'background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%); border:none;' : '';
+                const titleColor = isHighlight ? 'color:white' : '';
+                
+                return `
+                <div class="dashboard-card" style="${cardStyle}">
+                    <div class="card-top">
+                        <div class="card-icon" style="${isHighlight ? 'background:rgba(255,255,255,0.2); color:white;' : ''}">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
                         </div>
-                        <div class="item-info">
-                            <strong>${t.nome}</strong>
-                            <small>${t.assunto}</small>
+                        <div class="card-actions">
+                            <button class="icon-btn" onclick="window.editarTemplate(${t.id})">✎</button>
+                            <button class="icon-btn delete" onclick="window.deletarTemplate(${t.id})">✕</button>
                         </div>
                     </div>
-                    <div class="item-actions">
-                        <button class="action-btn" onclick="window.editarTemplate(${t.id})">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                        <button class="action-btn delete" onclick="window.deletarTemplate(${t.id})">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                        </button>
+                    <div class="card-content">
+                        <h3 style="${titleColor}">${t.nome}</h3>
+                        <p style="${titleColor ? 'color:rgba(255,255,255,0.8)' : ''}">${t.assunto}</p>
+                        <div class="card-tags">
+                            <span class="pill dark">HTML</span>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
 
         function renderFluxos() {
             const ui = document.getElementById('listaFluxosUI');
-            if(!cache.fluxos.length) { ui.innerHTML = '<div style="text-align:center; padding:40px; color:#555;">Nenhum fluxo.</div>'; return; }
+            ui.className = 'grid-container';
+            
+            if(!cache.fluxos.length) { ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum fluxo.</div>'; return; }
 
             ui.innerHTML = cache.fluxos.map(f => `
-                <div class="list-item">
-                    <div class="item-left">
-                        <div class="item-icon" style="background:rgba(16, 185, 129, 0.15); color:#34d399;">
+                <div class="dashboard-card">
+                    <div class="card-top">
+                        <div class="card-icon" style="background: rgba(16, 185, 129, 0.1); color:#10b981;">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
                         </div>
-                        <div class="item-info">
-                            <strong>${f.nome}</strong>
-                            <small style="opacity:0.7;">${f.steps.length} passos configurados</small>
+                        <div class="card-actions">
+                            <button class="icon-btn delete" onclick="window.deletarFluxo(${f.id})">✕</button>
                         </div>
                     </div>
-                    <div class="item-actions">
-                        <button class="action-btn delete" onclick="window.deletarFluxo(${f.id})">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                        </button>
+                    <div class="card-content">
+                        <h3>${f.nome}</h3>
+                        <p>${f.steps.length} passos de automação</p>
+                        <div class="card-tags">
+                            ${f.steps.map(s => `<span class="pill purple">+${s.delay}h</span>`).join('')}
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -358,7 +380,9 @@
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = 'toast';
-            toast.innerHTML = `<span>${msg}</span>`;
+            // Ícones SVG no toast
+            let icon = type==='success' ? '✅' : type==='error' ? '❌' : 'ℹ️';
+            toast.innerHTML = `<span style="font-size:1.2rem">${icon}</span><span>${msg}</span>`;
             if(type==='success') toast.style.borderLeftColor = '#4ade80';
             if(type==='error') toast.style.borderLeftColor = '#f87171';
             container.appendChild(toast);
@@ -395,7 +419,7 @@
             document.getElementById('selectGrupoEnvio').innerHTML = gOpts;
         }
 
-        // CRUD
+        // CRUD (Mantenha o mesmo do anterior, está funcionando bem)
         window.novoGrupo = () => { document.getElementById('grupoId').value=''; document.getElementById('grupoNome').value=''; document.getElementById('grupoEmails').value=''; document.getElementById('formGrupo').style.display='block'; }
         window.editarGrupo = (id) => { const g=cache.grupos.find(x=>x.id===id); if(g){ document.getElementById('grupoId').value=g.id; document.getElementById('grupoNome').value=g.nome; document.getElementById('grupoEmails').value=g.emails.join('\n'); document.getElementById('formGrupo').style.display='block'; } }
         window.salvarGrupo = async () => {
@@ -425,13 +449,14 @@
             const opts='<option value="">Selecione...</option>'+cache.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
             document.getElementById('stepsContainer').innerHTML = currentFlowSteps.map((s,i)=>`
                 <div style="position:relative; padding-left:30px; margin-bottom:20px; border-left:2px dashed rgba(255,255,255,0.1);">
+                    <div style="position:absolute; left:-9px; top:20px; width:16px; height:16px; border-radius:50%; background:#09090b; border:2px solid #8b5cf6;"></div>
                     <div style="padding:20px; display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.05); border-radius:12px;">
                         <div style="font-family:'Syne'; font-size:1.5rem; opacity:0.2;">${i+1}</div>
                         <div style="flex:1">
                             <label>Modelo:</label><select class="glass-input" style="margin-bottom:10px;" onchange="window.updateStepData(${i},'templateId',this.value)">${opts.replace(`value="${s.templateId}"`,`value="${s.templateId}" selected`)}</select>
                             <label>Esperar (Horas):</label><input type="number" class="glass-input" value="${s.delay}" style="margin-bottom:0;" onchange="window.updateStepData(${i},'delay',this.value)">
                         </div>
-                        <button class="action-btn" onclick="window.removerPasso(${i})">X</button>
+                        <button class="icon-btn delete" onclick="window.removerPasso(${i})">X</button>
                     </div>
                 </div>`).join('');
         }
@@ -442,12 +467,12 @@
         }
         window.deletarFluxo = async (id) => { if(confirm('Apagar?')) { await fetch('/api/flows', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})}); carregarDados(); } }
 
-        // DISPARO
+        // DISPARO (MANTÉM O MESMO DO ÚLTIMO, FUNCIONA BEM)
         document.getElementById('btnStart').addEventListener('click', async () => {
             const gid=document.getElementById('selectGrupoEnvio').value, tid=document.getElementById('selectTemplateEnvio').value, avulsos=document.getElementById('emailsAvulsos').value;
             let list=[]; if(gid){const g=cache.grupos.find(x=>x.id==gid); if(g) list=[...g.emails];} if(avulsos) list=[...list, ...avulsos.split('\n').filter(e=>e.includes('@'))]; list=[...new Set(list)];
             if(!list.length) return showToast('Sem emails', 'error');
-            let subj='', html=''; if(tid){const t=cache.templates.find(x=>x.id==tid); subj=t.assunto; html=t.html;} else {subj='Aviso'; html='<p>Olá</p>';} // Fallback safe
+            let subj='', html=''; if(tid){const t=cache.templates.find(x=>x.id==tid); subj=t.assunto; html=t.html;} else {subj='Aviso'; html='<p>Olá</p>';} 
             if(!confirm(`Enviar para ${list.length}?`)) return;
 
             const btn=document.getElementById('btnStart'); btn.disabled=true; btn.innerText = "ENVIANDO...";
