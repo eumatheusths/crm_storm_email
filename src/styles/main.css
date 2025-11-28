@@ -1,0 +1,197 @@
+/* src/styles/main.css */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Syne:wght@600;700;800&display=swap');
+
+:root {
+    --bg-deep: #020203; /* Fundo Ultra Dark */
+    --bg-card: #0F0F11; /* Cor base dos cards */
+    --bg-card-hover: #18181b;
+    
+    /* Acento Roxo Neon (Referência) */
+    --accent-color: #7c3aed; 
+    --accent-dim: rgba(124, 58, 237, 0.15);
+    --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+    
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    
+    --radius-card: 18px;
+    --radius-btn: 12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { 
+    background-color: var(--bg-deep);
+    /* Glow sutil no fundo */
+    background-image: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.1), transparent 40%);
+    color: var(--text-primary); 
+    height: 100vh; 
+    display: flex; 
+    font-family: 'Archivo', sans-serif;
+    overflow: hidden;
+}
+
+h1, h2, h3 { font-family: 'Syne', sans-serif; }
+
+/* --- COMPONENTES VISUAIS --- */
+
+/* O Card Principal com Efeito Vidro Escuro */
+.glass-panel {
+    background: rgba(15, 15, 17, 0.7);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.glass-input {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-subtle);
+    color: white;
+    transition: 0.3s;
+}
+.glass-input:focus { border-color: var(--accent-color); background: rgba(0,0,0,0.5); }
+
+/* --- LAYOUT --- */
+.app-container { display: flex; height: 100%; width: 100%; }
+
+/* Sidebar */
+aside { 
+    width: 280px; 
+    padding: 30px 20px; 
+    display: flex; flex-direction: column; 
+    border-right: 1px solid var(--border-subtle);
+    background: rgba(5, 5, 5, 0.8);
+    z-index: 10;
+}
+
+.user-profile { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; padding: 0 10px; }
+.avatar { 
+    width: 42px; height: 42px; border-radius: 12px; 
+    background: linear-gradient(135deg, #312e81, #4338ca); 
+    display: flex; align-items: center; justify-content: center; 
+    font-weight: 700; color: #e0e7ff; font-family: 'Syne';
+}
+
+.nav-btn { 
+    background: transparent; border: none; color: var(--text-secondary); 
+    padding: 8px; text-align: left; cursor: pointer; border-radius: 14px; 
+    margin-bottom: 4px; font-size: 0.9rem; font-weight: 500; 
+    display: flex; align-items: center; gap: 12px; width: 100%; transition: 0.2s; 
+}
+.nav-icon-box {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.03); color: var(--text-secondary); transition: 0.2s;
+}
+.nav-btn:hover { color: white; }
+.nav-btn:hover .nav-icon-box { background: rgba(255,255,255,0.1); color: white; }
+
+.nav-btn.active { color: white; }
+.nav-btn.active .nav-icon-box { 
+    background: var(--accent-gradient); color: white; 
+    box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
+}
+
+/* Main Content */
+main { flex: 1; padding: 40px; overflow-y: auto; }
+h2 { font-size: 2rem; margin-bottom: 30px; font-weight: 700; letter-spacing: -0.5px; }
+
+/* Cards de Conteúdo */
+.card { border-radius: 24px; padding: 32px; margin-bottom: 24px; border: 1px solid var(--border-subtle); background: var(--bg-card); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+
+/* --- LISTAS ESTILO "SALESFORCE DARK" (AQUI ESTÁ A CORREÇÃO PRINCIPAL) --- */
+.list-item { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; /* Separa esquerda e direita */
+    padding: 16px 20px; 
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    margin-bottom: 12px; /* Respiro vertical */
+    transition: all 0.2s ease;
+}
+
+.list-item:hover {
+    transform: translateY(-2px); /* Efeito flutuante */
+    background: var(--bg-card-hover);
+    border-color: rgba(124, 58, 237, 0.3); /* Borda roxa ao passar mouse */
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+}
+
+/* Área Esquerda do Card (Ícone + Texto) */
+.item-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Ícone Quadrado do Item */
+.item-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    background: var(--accent-dim);
+    color: #a78bfa;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+.item-info strong { display: block; font-size: 1rem; color: white; margin-bottom: 4px; }
+.item-info small { color: var(--text-secondary); font-size: 0.85rem; }
+
+/* Área Direita (Botões) */
+.item-actions { display: flex; gap: 8px; }
+
+/* Botões de Ação (Lápis/Lixo) */
+.action-btn { 
+    width: 38px; height: 38px; 
+    border-radius: 10px; border: none;
+    background: rgba(255,255,255,0.05); color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: 0.2s;
+}
+.action-btn:hover { background: rgba(255,255,255,0.1); color: white; transform: scale(1.05); }
+.action-btn.delete:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+/* Inputs e Botões Gerais */
+input, select, textarea { width: 100%; padding: 14px 18px; border-radius: var(--radius-btn); font-size: 0.95rem; margin-bottom: 20px; font-family: 'Archivo'; outline:none;}
+label { display: block; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
+
+button.primary { 
+    background: var(--accent-gradient); color: white; border: none; 
+    padding: 14px 28px; border-radius: 14px; font-weight: 600; width: 100%; 
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4); transition: 0.3s;
+}
+button.primary:hover { filter: brightness(1.1); transform: translateY(-2px); }
+
+button.secondary { 
+    background: transparent; border: 1px solid var(--border-subtle); color: white; 
+    padding: 10px 20px; border-radius: 12px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap:8px;
+}
+button.secondary:hover { background: rgba(255,255,255,0.05); }
+
+/* Toasts */
+#toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+.toast { padding: 16px 24px; border-radius: 16px; background: #18181b; border: 1px solid var(--border-subtle); color: white; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: slideIn 0.3s; border-left: 4px solid #7c3aed; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+#progress-widget { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(150px); width: 400px; padding: 24px; background: #121212; border: 1px solid var(--border-subtle); border-radius: 24px; z-index: 1000; transition: 0.5s; opacity: 0; box-shadow: 0 20px 50px black; }
+#progress-widget.active { transform: translateX(-50%) translateY(0); opacity: 1; }
+.progress-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+.progress-fill { height: 100%; background: var(--accent-gradient); width: 0%; transition: width 0.3s; }
+
+/* Mobile */
+@media (max-width: 768px) {
+    .app-container { flex-direction: column; }
+    aside { position: fixed; bottom: 0; width: 100%; height: 75px; flex-direction: row; justify-content: space-around; padding: 10px; border-top: 1px solid var(--border-subtle); background: rgba(9,9,11,0.95); backdrop-filter: blur(20px); } 
+    .user-profile, aside h1 { display: none; }
+    .nav-btn { flex-direction: column; padding: 0; gap: 4px; justify-content: center; width: auto; background: none !important; font-size: 0.7rem; }
+    .nav-icon-box { width: 32px; height: 32px; margin: 0 auto; }
+    main { padding: 20px; padding-bottom: 100px; }
+    .list-item { padding: 12px; }
+    .item-icon { width: 40px; height: 40px; }
+}

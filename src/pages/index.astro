@@ -1,0 +1,530 @@
+---
+---
+
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Storm Email Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-deep: #09090b; /* Preto profundo */
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --bg-glass-hover: rgba(255, 255, 255, 0.06);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            
+            --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+            --accent-glow: 0 8px 20px -4px rgba(139, 92, 246, 0.5);
+            
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            
+            --radius-xl: 24px;
+            --radius-md: 14px;
+            --radius-sm: 10px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            background-color: var(--bg-deep);
+            background-image: radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.05), transparent 40%),
+                              radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.05), transparent 40%);
+            color: var(--text-primary); 
+            height: 100vh; 
+            display: flex; 
+            font-family: 'Archivo', sans-serif;
+            overflow: hidden;
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Syne', sans-serif; }
+
+        /* --- CLASSES DE VIDRO --- */
+        .glass-panel {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-glass);
+            color: white;
+            transition: 0.3s;
+        }
+        .glass-input:focus {
+            border-color: #8b5cf6;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- LAYOUT --- */
+        .app-container { display: flex; height: 100%; width: 100%; }
+        
+        aside { 
+            width: 290px; 
+            padding: 30px 20px; 
+            display: flex; 
+            flex-direction: column; 
+            border-right: 1px solid var(--border-glass);
+            z-index: 10;
+        }
+        
+        /* User Profile na Sidebar (Igual foto) */
+        .user-profile {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 40px; padding: 0 10px;
+        }
+        .avatar {
+            width: 40px; height: 40px; border-radius: 12px;
+            background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+            display: flex; align-items: center; justify-content: center;
+            color: #3730a3; font-weight: 700; font-family: 'Syne';
+        }
+
+        /* Botões da Sidebar (Estilo Referência) */
+        .nav-btn { 
+            background: transparent; 
+            border: none; 
+            color: var(--text-secondary); 
+            padding: 10px; 
+            text-align: left; 
+            cursor: pointer; 
+            border-radius: var(--radius-md); 
+            margin-bottom: 8px; 
+            font-size: 0.95rem; 
+            font-weight: 500;
+            display: flex; align-items: center; gap: 16px; 
+            width: 100%; 
+            transition: all 0.3s;
+        }
+        
+        /* Caixa do ícone (Quadrado arredondado) */
+        .nav-icon-box {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.03);
+            transition: 0.3s;
+            color: var(--text-secondary);
+        }
+
+        .nav-btn:hover .nav-icon-box { background: rgba(255,255,255,0.1); color: white; }
+        .nav-btn:hover { color: white; }
+        
+        /* Estado Ativo (Gradiente) */
+        .nav-btn.active .nav-icon-box { 
+            background: var(--accent-gradient);
+            color: white;
+            box-shadow: 0 6px 15px rgba(124, 58, 237, 0.4);
+        }
+        .nav-btn.active { color: white; font-weight: 600; }
+
+        main { flex: 1; padding: 40px; overflow-y: auto; position: relative; }
+        
+        .screen { display: none; max-width: 900px; margin: 0 auto; animation: fadeScale 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .screen.active { display: block; }
+        @keyframes fadeScale { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+        h2 { font-size: 2.2rem; margin-bottom: 30px; font-weight: 700; }
+        
+        /* UI Elements */
+        .card { border-radius: var(--radius-xl); padding: 32px; margin-bottom: 25px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        
+        label { display: block; font-weight: 500; margin-bottom: 10px; font-size: 0.9rem; color: var(--text-secondary); }
+        input, select, textarea { width: 100%; padding: 16px; border-radius: var(--radius-md); font-size: 1rem; font-family: 'Archivo', sans-serif; outline: none; margin-bottom: 20px; }
+
+        /* Botões Principais */
+        button { font-family: 'Archivo', sans-serif; cursor: pointer; transition: 0.3s; }
+        
+        button.primary { 
+            background: var(--accent-gradient); 
+            color: white; border: none; 
+            padding: 16px 32px; border-radius: 14px; font-weight: 600; 
+            width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+            box-shadow: var(--accent-glow);
+        }
+        button.primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        
+        button.secondary { 
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); 
+            color: var(--text-primary); padding: 10px 20px; border-radius: 12px; 
+            font-size: 0.85rem; display: flex; align-items: center; gap: 8px;
+        }
+        button.secondary:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
+
+        /* Botões de Ação (Círculos) */
+        .action-btn { 
+            background: rgba(255,255,255,0.05); border: none; 
+            color: var(--text-secondary); width: 36px; height: 36px; 
+            border-radius: 10px; /* Squircle */
+            display: flex; align-items: center; justify-content: center; 
+            transition: 0.2s; 
+        }
+        .action-btn:hover { background: white; color: black; }
+        .action-btn.delete:hover { background: #ef4444; color: white; }
+
+        /* Listas */
+        .list-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 18px 24px; border-radius: var(--radius-md); 
+            margin-bottom: 12px; transition: 0.2s; 
+            background: rgba(255,255,255,0.02);
+            border: 1px solid transparent;
+        }
+        .list-item:hover { background: rgba(255,255,255,0.05); border-color: var(--border-glass); }
+        
+        .badge { 
+            background: rgba(59, 130, 246, 0.15); color: #93c5fd; 
+            padding: 4px 10px; border-radius: 6px; 
+            font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px;
+        }
+
+        /* Toasts & Widget */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 12px; }
+        .toast { padding: 16px 24px; border-radius: 16px; color: white; display: flex; align-items: center; gap: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); animation: slideIn 0.3s; background: #18181b; border: 1px solid rgba(255,255,255,0.1); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        #progress-widget { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(150px); width: 420px; padding: 24px; border-radius: 24px; z-index: 1000; transition: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); opacity: 0; background: #121212; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.7); }
+        #progress-widget.active { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .progress-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 12px; }
+        .progress-fill { height: 100%; background: var(--accent-gradient); width: 0%; transition: width 0.3s ease; }
+
+        /* Flow Step */
+        .flow-step::before { background: #09090b; border-color: #8b5cf6; }
+
+        @media (max-width: 768px) {
+            .app-container { flex-direction: column; }
+            aside { position: fixed; bottom: 0; width: 100%; height: 80px; flex-direction: row; justify-content: space-evenly; padding: 10px; background: rgba(9, 9, 11, 0.95); backdrop-filter: blur(20px); border-top: 1px solid var(--border-glass); } 
+            .user-profile { display: none; }
+            .nav-btn { flex-direction: column; font-size: 0.65rem; padding: 0; gap: 4px; justify-content: center; width: auto; background: none !important; }
+            .nav-icon-box { width: 42px; height: 32px; border-radius: 12px; margin-bottom: 2px; }
+            .nav-btn span { opacity: 0.7; }
+            .nav-btn.active span { opacity: 1; }
+            main { padding: 20px; padding-bottom: 100px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+    <div id="progress-widget">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong style="font-family:'Syne'; font-size:1.1rem">Enviando...</strong><span id="progress-text" style="color:var(--text-secondary);">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <small id="progress-detail" style="display:block; margin-top:10px; color:var(--text-secondary);">Preparando motores...</small>
+    </div>
+
+    <div class="app-container">
+        <aside class="glass-panel" style="border-radius: 0 24px 24px 0; border-left:none; border-top:none; border-bottom:none;">
+            <div class="user-profile">
+                <div class="avatar">S</div>
+                <div>
+                    <div style="font-weight:700; font-family:'Syne'">Storm Pro</div>
+                    <div style="font-size:0.8rem; color:var(--text-secondary)">Nicopel Admin</div>
+                </div>
+            </div>
+
+            <button class="nav-btn active" onclick="window.showScreen('disparo')">
+                <div class="nav-icon-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </div>
+                <span>Disparar</span>
+            </button>
+            
+            <button class="nav-btn" onclick="window.showScreen('grupos')">
+                <div class="nav-icon-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                </div>
+                <span>Grupos</span>
+            </button>
+            
+            <button class="nav-btn" onclick="window.showScreen('templates')">
+                <div class="nav-icon-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                </div>
+                <span>Templates</span>
+            </button>
+            
+            <button class="nav-btn" onclick="window.showScreen('fluxos')">
+                <div class="nav-icon-box">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
+                </div>
+                <span>Fluxos</span>
+            </button>
+        </aside>
+
+        <main>
+            <div id="disparo" class="screen active">
+                <h2>Disparo Rápido</h2>
+                <div class="card glass-panel">
+                    <label>Para quem enviar?</label>
+                    <select id="selectGrupoEnvio" class="glass-input"><option value="">Carregando...</option></select>
+                    <textarea id="emailsAvulsos" class="glass-input" placeholder="Ou cole e-mails aqui..." style="height: 60px;"></textarea>
+                </div>
+                <div class="card glass-panel">
+                    <label>Qual mensagem?</label>
+                    <select id="selectTemplateEnvio" class="glass-input"><option value="">-- Manual --</option></select>
+                </div>
+                <button class="primary" id="btnStart">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    ENVIAR AGORA
+                </button>
+            </div>
+
+            <div id="grupos" class="screen">
+                <div class="card-header"><h2>Grupos</h2><button class="secondary" onclick="window.novoGrupo()">+ Novo</button></div>
+                <div id="listaGruposUI"></div>
+                <div class="card glass-panel" id="formGrupo" style="display:none; border: 1px solid #8b5cf6;">
+                    <div class="card-header"><h3>Grupo</h3><button class="secondary" onclick="document.getElementById('formGrupo').style.display='none'">X</button></div>
+                    <input type="hidden" id="grupoId"><label>Nome</label><input type="text" id="grupoNome" class="glass-input"><label>E-mails</label><textarea id="grupoEmails" class="glass-input" style="height:150px;"></textarea>
+                    <button class="primary" onclick="window.salvarGrupo()">Salvar</button>
+                </div>
+            </div>
+
+            <div id="templates" class="screen">
+                <div class="card-header"><h2>Templates</h2><button class="secondary" onclick="window.novoTemplate()">+ Novo</button></div>
+                <div id="listaTemplatesUI"></div>
+                <div class="card glass-panel" id="formTemplate" style="display:none; border: 1px solid #8b5cf6;">
+                    <div class="card-header"><h3>Template</h3><button class="secondary" onclick="document.getElementById('formTemplate').style.display='none'">X</button></div>
+                    <input type="hidden" id="tempId"><label>Nome</label><input type="text" id="tempNome" class="glass-input"><label>Assunto</label><input type="text" id="tempAssunto" class="glass-input"><label>HTML</label><textarea id="tempHtml" class="glass-input" style="height:200px; font-family:'Courier New'"></textarea>
+                    <div style="display:flex; gap:10px; margin-bottom:20px;"><button class="secondary" onclick="window.inserirImg()">Img</button><button class="secondary" onclick="window.inserirLink()">Link</button></div>
+                    <button class="primary" onclick="window.salvarTemplate()">Salvar</button>
+                </div>
+            </div>
+
+            <div id="fluxos" class="screen">
+                <div class="card-header"><h2>Automação</h2><button class="secondary" onclick="window.novoFluxo()">+ Criar</button></div>
+                <div id="listaFluxosUI"></div>
+                <div class="card glass-panel" id="formFluxo" style="display:none; border: 1px solid #8b5cf6;">
+                    <div class="card-header"><h3>Editor de Fluxo</h3><button class="secondary" onclick="document.getElementById('formFluxo').style.display='none'">X</button></div>
+                    <label>Nome da Campanha</label><input type="text" id="flowNome" class="glass-input">
+                    <div id="stepsContainer" style="margin: 20px 0;"></div>
+                    <button class="secondary" onclick="window.adicionarPasso()" style="width:100%; margin-bottom:20px; border-style:dashed;">+ Adicionar Passo</button>
+                    <button class="primary" onclick="window.salvarFluxo()">Salvar Fluxo</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- FUNÇÕES DE RENDERIZAÇÃO (UI ATUALIZADA) ---
+
+        // 1. Renderizar Grupos
+        function renderGrupos() {
+            const ui = document.getElementById('listaGruposUI');
+            if(!cache.grupos.length) {
+                ui.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5;">Nenhum grupo criado.</div>';
+                return;
+            }
+            
+            ui.innerHTML = cache.grupos.map(g => `
+                <div class="list-item">
+                    <div class="item-left">
+                        <div class="item-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </div>
+                        <div class="item-info">
+                            <strong>${g.nome}</strong>
+                            <small>${g.emails ? g.emails.length : 0} contatos cadastrados</small>
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="action-btn" onclick="window.editarGrupo(${g.id})" title="Editar">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button class="action-btn delete" onclick="window.deletarGrupo(${g.id})" title="Excluir">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 2. Renderizar Templates
+        function renderTemplates() {
+            const ui = document.getElementById('listaTemplatesUI');
+            if(!cache.templates.length) {
+                ui.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5;">Nenhum template criado.</div>';
+                return;
+            }
+
+            ui.innerHTML = cache.templates.map(t => `
+                <div class="list-item">
+                    <div class="item-left">
+                        <div class="item-icon" style="background: rgba(59, 130, 246, 0.15); color:#60a5fa;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                        </div>
+                        <div class="item-info">
+                            <strong>${t.nome}</strong>
+                            <small>${t.assunto}</small>
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="action-btn" onclick="window.editarTemplate(${t.id})" title="Editar">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button class="action-btn delete" onclick="window.deletarTemplate(${t.id})" title="Excluir">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 3. Renderizar Fluxos
+        function renderFluxos() {
+            const ui = document.getElementById('listaFluxosUI');
+            if(!cache.fluxos.length) {
+                ui.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5;">Nenhum fluxo criado.</div>';
+                return;
+            }
+
+            ui.innerHTML = cache.fluxos.map(f => `
+                <div class="list-item">
+                    <div class="item-left">
+                        <div class="item-icon" style="background: rgba(16, 185, 129, 0.15); color:#34d399;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.048 2.993c-4.965 0-8.995 4.03-8.995 8.996s4.03 8.996 8.995 8.996c4.965 0 8.996-4.03 8.996-8.996 0-4.966-4.03-8.996-8.996-8.996zm0 16.192c-3.97 0-7.196-3.226-7.196-7.196 0-3.97 3.226-7.196 7.196-7.196 3.97 0 7.196 3.226 7.196 7.196 0 3.97-3.226 7.196-7.196 7.196z"/><path d="M12.632 12.676l2.368-2.368-1.272-1.272-3.64 3.64 3.64 3.64 1.272-1.272-2.368-2.368z"/></svg>
+                        </div>
+                        <div class="item-info">
+                            <strong>${f.nome}</strong>
+                            <small style="opacity:0.8; display:flex; gap:8px; margin-top:4px;">
+                                ${f.steps.map((s,i) => `<span style="background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; font-size:0.7rem;">Passo ${i+1} (${s.delay}h)</span>`).join('')}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="action-btn delete" onclick="window.deletarFluxo(${f.id})" title="Excluir">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- MANTER O RESTANTE DO CÓDIGO (CRUD/FUNÇÕES) IGUAL AO ANTERIOR ---
+        
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `glass-panel toast`;
+            // Ícones coloridos nos Toasts
+            let icon = type==='success' ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="#4ade80"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' : 
+                       type==='error' ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="#f87171"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>' : '';
+            toast.innerHTML = `${icon}<span>${msg}</span>`;
+            if(type==='error') toast.style.borderLeft = "4px solid #f87171";
+            if(type==='success') toast.style.borderLeft = "4px solid #4ade80";
+            container.appendChild(toast);
+            setTimeout(()=>{toast.remove()}, 4000);
+        }
+
+        let cache = { grupos: [], templates: [], fluxos: [] };
+        let currentFlowSteps = [];
+
+        window.showScreen = (id) => {
+            document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            const map = {'disparo':0, 'grupos':1, 'templates':2, 'fluxos':3};
+            document.querySelectorAll('.nav-btn')[map[id]].classList.add('active');
+            carregarDados();
+        };
+
+        async function carregarDados() {
+            try {
+                const g = await fetch('/api/groups'); cache.grupos = await g.json();
+                const t = await fetch('/api/templates'); cache.templates = await t.json();
+                const f = await fetch('/api/flows'); cache.fluxos = await f.json();
+                renderAll();
+            } catch(e) { console.error(e); }
+        }
+
+        function renderAll() { renderGrupos(); renderTemplates(); renderFluxos(); populateSelects(); }
+        
+        function populateSelects() {
+            const opts = '<option value="">-- Selecione --</option>' + cache.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+            document.getElementById('selectTemplateEnvio').innerHTML = opts;
+            const gOpts = '<option value="">-- Selecione --</option>' + cache.grupos.map(g=>`<option value="${g.id}">${g.nome}</option>`).join('');
+            document.getElementById('selectGrupoEnvio').innerHTML = gOpts;
+        }
+
+        // --- CRUD LÓGICA ---
+        window.novoGrupo = () => { document.getElementById('grupoId').value=''; document.getElementById('grupoNome').value=''; document.getElementById('grupoEmails').value=''; document.getElementById('formGrupo').style.display='block'; }
+        window.editarGrupo = (id) => { const g=cache.grupos.find(x=>x.id===id); if(g){ document.getElementById('grupoId').value=g.id; document.getElementById('grupoNome').value=g.nome; document.getElementById('grupoEmails').value=g.emails.join('\n'); document.getElementById('formGrupo').style.display='block'; } }
+        window.salvarGrupo = async () => {
+            const id=document.getElementById('grupoId').value, nome=document.getElementById('grupoNome').value, emails=document.getElementById('grupoEmails').value.split('\n').map(e=>e.trim()).filter(e=>e.includes('@'));
+            if(!nome || !emails.length) return showToast('Preencha tudo', 'error');
+            await fetch('/api/groups', { method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, nome, emails}) });
+            document.getElementById('formGrupo').style.display='none'; showToast('Salvo!', 'success'); carregarDados();
+        }
+        window.deletarGrupo = async (id) => { if(confirm('Apagar?')) { await fetch('/api/groups', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})}); showToast('Apagado', 'success'); carregarDados(); } }
+
+        window.novoTemplate = () => { document.getElementById('tempId').value=''; document.getElementById('tempNome').value=''; document.getElementById('tempAssunto').value=''; document.getElementById('tempHtml').value=''; document.getElementById('formTemplate').style.display='block'; }
+        window.editarTemplate = (id) => { const t=cache.templates.find(x=>x.id===id); if(t){ document.getElementById('tempId').value=t.id; document.getElementById('tempNome').value=t.nome; document.getElementById('tempAssunto').value=t.assunto; document.getElementById('tempHtml').value=t.html; document.getElementById('formTemplate').style.display='block'; } }
+        window.salvarTemplate = async () => {
+            const id=document.getElementById('tempId').value, nome=document.getElementById('tempNome').value, assunto=document.getElementById('tempAssunto').value, html=document.getElementById('tempHtml').value;
+            if(!nome || !assunto) return showToast('Preencha tudo', 'error');
+            await fetch('/api/templates', { method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, nome, assunto, html}) });
+            document.getElementById('formTemplate').style.display='none'; showToast('Salvo!', 'success'); carregarDados();
+        }
+        window.deletarTemplate = async (id) => { if(confirm('Apagar?')) { await fetch('/api/templates', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})}); showToast('Apagado', 'success'); carregarDados(); } }
+        window.inserirImg = () => { const u=prompt("URL Imagem:"); if(u) document.getElementById('tempHtml').value+=`<img src="${u}" style="max-width:100%">`; }
+        window.inserirLink = () => { const u=prompt("URL Link:"); const t=prompt("Texto:"); if(u) document.getElementById('tempHtml').value+=`<a href="${u}">${t||'Link'}</a>`; }
+
+        // FLUXOS
+        window.novoFluxo = () => { currentFlowSteps=[{templateId:'', delay:0}]; document.getElementById('flowNome').value=''; renderStepsEditor(); document.getElementById('formFluxo').style.display='block'; }
+        window.adicionarPasso = () => { currentFlowSteps.push({templateId:'', delay:24}); renderStepsEditor(); }
+        window.removerPasso = (i) => { currentFlowSteps.splice(i,1); renderStepsEditor(); }
+        window.updateStepData = (i, f, v) => { currentFlowSteps[i][f]=v; }
+        function renderStepsEditor() {
+            const opts='<option value="">Selecione...</option>'+cache.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+            document.getElementById('stepsContainer').innerHTML = currentFlowSteps.map((s,i)=>`
+                <div style="position:relative; padding-left:30px; margin-bottom:20px; border-left:2px dashed rgba(255,255,255,0.1);">
+                    <div style="position:absolute; left:-9px; top:20px; width:16px; height:16px; border-radius:50%; background:#09090b; border:2px solid #8b5cf6;"></div>
+                    <div style="padding:20px; display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.02); border-radius:12px;">
+                        <div style="font-family:'Syne'; font-size:1.5rem; opacity:0.2;">${i+1}</div>
+                        <div style="flex:1">
+                            <label>Modelo:</label><select class="glass-input" style="margin-bottom:10px;" onchange="window.updateStepData(${i},'templateId',this.value)">${opts.replace(`value="${s.templateId}"`,`value="${s.templateId}" selected`)}</select>
+                            <label>Esperar (Horas):</label><input type="number" class="glass-input" value="${s.delay}" style="margin-bottom:0;" onchange="window.updateStepData(${i},'delay',this.value)">
+                        </div>
+                        <button class="action-btn delete" onclick="window.removerPasso(${i})">X</button>
+                    </div>
+                </div>`).join('');
+        }
+        window.salvarFluxo = async () => {
+            const nome=document.getElementById('flowNome').value; if(!nome||currentFlowSteps.some(s=>!s.templateId)) return showToast('Erro', 'error');
+            await fetch('/api/flows', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nome, steps:currentFlowSteps})});
+            document.getElementById('formFluxo').style.display='none'; showToast('Salvo', 'success'); carregarDados();
+        }
+        window.deletarFluxo = async (id) => { if(confirm('Apagar?')) { await fetch('/api/flows', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})}); carregarDados(); } }
+
+        // DISPARO
+        document.getElementById('btnStart').addEventListener('click', async () => {
+            const gid=document.getElementById('selectGrupoEnvio').value, tid=document.getElementById('selectTemplateEnvio').value, avulsos=document.getElementById('emailsAvulsos').value;
+            let list=[]; if(gid){const g=cache.grupos.find(x=>x.id==gid); if(g) list=[...g.emails];} if(avulsos) list=[...list, ...avulsos.split('\n').filter(e=>e.includes('@'))]; list=[...new Set(list)];
+            if(!list.length) return showToast('Sem emails', 'error');
+            let subj='', html=''; if(tid){const t=cache.templates.find(x=>x.id==tid); subj=t.assunto; html=t.html;} else {subj=prompt('Assunto'); html=prompt('HTML');}
+            if(!confirm(`Enviar para ${list.length}?`)) return;
+
+            const btn=document.getElementById('btnStart'), w=document.getElementById('progress-widget'), pf=document.getElementById('progress-fill'), pt=document.getElementById('progress-text'), pd=document.getElementById('progress-detail');
+            btn.disabled=true; w.classList.add('active');
+            let suc=0, err=0;
+            for(let i=0; i<list.length; i+=5) {
+                const batch=list.slice(i, i+5);
+                const perc=Math.round((i/list.length)*100); pf.style.width=`${perc}%`; pt.innerText=`${perc}%`; pd.innerText=`Lote ${Math.ceil(i/5)+1}...`;
+                await Promise.all(batch.map(e=>fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e, subject:subj, html})}).then(r=>r.ok?suc++:err++)));
+                await new Promise(r=>setTimeout(r,1000));
+            }
+            pf.style.width='100%'; pt.innerText='100%'; pd.innerText='Fim!';
+            setTimeout(()=>{w.classList.remove('active'); showToast(`Sucesso: ${suc} | Erros: ${err}`, 'success'); btn.disabled=false;}, 2000);
+        });
+
+        carregarDados();
+    </script>
+</body>
+</html>
