@@ -6,486 +6,627 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Storm Email Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* --- DESIGN SYSTEM (CORRIGIDO) --- */
         :root {
-            --bg-deep: #050505;
-            --bg-glass: rgba(255, 255, 255, 0.03);
-            --bg-glass-hover: rgba(255, 255, 255, 0.07);
-            --border-glass: rgba(255, 255, 255, 0.08);
+            /* 1.1 Paleta de Cores (Direção de Arte) */
+            --bg-absolute: #000000;
+            --bg-sidebar: #050505;
+            --bg-panel: #0A0A0A;
             
-            --accent-primary: #7c3aed;
-            --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
-            --text-primary: #ffffff;
-            --text-secondary: #a1a1aa;
+            --card-surface: rgba(255, 255, 255, 0.03);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --card-hover: rgba(255, 255, 255, 0.06);
             
-            --radius-xl: 20px;
-            --radius-md: 12px;
+            /* Cores de Acento */
+            --accent-purple: #723CEB;
+            --accent-orange: #F4893C;
+            --accent-gradient: linear-gradient(135deg, #723CEB 0%, #A855F7 100%);
+            
+            /* Tipografia */
+            --text-primary: #FFFFFF;
+            --text-secondary: #858585; /* Cinza médio para reduzir ruído */
+            --text-tertiary: #4A4A4A;
+            
+            /* Formas */
+            --radius-sm: 8px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
         
         body { 
-            background-color: var(--bg-deep);
-            background-image: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.15), transparent 50%);
+            background-color: var(--bg-absolute);
             color: var(--text-primary); 
             height: 100vh; 
-            display: flex; 
-            font-family: 'Archivo', sans-serif;
+            font-family: 'Manrope', sans-serif;
+            overflow: hidden;
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- LAYOUT GRID DE 3 COLUNAS --- */
+        .app-grid {
+            display: grid;
+            grid-template-columns: 260px 1fr 400px; /* Sidebar | Lista | Painel de Ação */
+            height: 100%;
+            width: 100%;
+        }
+
+        /* --- COLUNA 1: SIDEBAR --- */
+        .sidebar {
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--card-border);
+            padding: 32px 20px;
+            display: flex; flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 48px;
+            padding-left: 12px;
+        }
+        .brand-icon {
+            width: 32px; height: 32px;
+            background: var(--accent-gradient);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px rgba(114, 60, 235, 0.4);
+        }
+        .brand-text { font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
+
+        .nav-menu { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+        
+        .nav-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px;
+            color: var(--text-secondary);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        .nav-item:hover { color: var(--text-primary); background: rgba(255,255,255,0.02); }
+        
+        .nav-item.active { 
+            background: var(--card-surface); 
+            color: var(--text-primary); 
+            font-weight: 600;
+        }
+        .nav-item.active .icon { color: var(--accent-purple); }
+
+        /* --- COLUNA 2: LISTA DE CONTEÚDO --- */
+        .main-list {
+            background: var(--bg-absolute);
+            padding: 40px;
+            overflow-y: auto;
+            border-right: 1px solid var(--card-border);
+        }
+
+        header {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-bottom: 40px;
+        }
+        h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.8px; }
+        .subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 8px; }
+
+        /* Cards List */
+        .cards-container { display: flex; flex-direction: column; gap: 16px; }
+
+        .card-item {
+            background: var(--card-surface);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: pointer;
+            position: relative;
             overflow: hidden;
         }
-
-        h1, h2, h3 { font-family: 'Syne', sans-serif; }
-
-        /* --- LAYOUT --- */
-        .app-container { display: flex; height: 100%; width: 100%; }
         
-        aside { 
-            width: 280px; 
-            padding: 30px 20px; 
-            display: flex; 
-            flex-direction: column; 
-            border-right: 1px solid var(--border-glass);
-            background: rgba(10, 10, 10, 0.8);
-            backdrop-filter: blur(20px);
-            z-index: 10;
+        /* Efeito Hover Glass */
+        .card-item:hover {
+            transform: translateY(-2px);
+            background: var(--card-hover);
+            border-color: rgba(255,255,255,0.15);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8);
         }
 
-        /* --- COMPONENTES VISUAIS --- */
-        .glass-panel {
-            background: var(--bg-glass);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--border-glass);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .glass-input {
-            width: 100%;
-            padding: 14px 18px;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid var(--border-glass);
-            color: white;
-            border-radius: var(--radius-md);
-            font-family: 'Archivo';
-            margin-bottom: 15px;
-            outline: none;
-            transition: 0.3s;
-        }
-        .glass-input:focus { border-color: var(--accent-primary); background: rgba(0,0,0,0.6); }
-
-        /* Botões da Sidebar */
-        .nav-btn { 
-            background: transparent; border: none; color: var(--text-secondary); 
-            padding: 12px; text-align: left; cursor: pointer; border-radius: var(--radius-md); 
-            margin-bottom: 8px; font-size: 0.95rem; font-weight: 500; 
-            display: flex; align-items: center; gap: 12px; width: 100%; transition: all 0.2s;
-        }
+        /* Card Content Layout */
+        .card-header { display: flex; justify-content: space-between; margin-bottom: 12px; }
+        .card-meta { display: flex; gap: 8px; align-items: center; }
         
-        .nav-icon-box {
-            width: 36px; height: 36px; border-radius: 10px;
+        .avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: linear-gradient(135deg, #333, #555);
             display: flex; align-items: center; justify-content: center;
-            background: rgba(255,255,255,0.05); transition: 0.2s;
+            font-size: 12px; font-weight: 700;
+        }
+        .purple-gradient { background: var(--accent-gradient); }
+
+        .card-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+        .card-preview { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+        /* Tags */
+        .tag {
+            padding: 4px 10px; border-radius: 100px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .tag.purple { background: rgba(114, 60, 235, 0.15); color: #A78BFA; border: 1px solid rgba(114, 60, 235, 0.3); }
+        .tag.orange { background: rgba(244, 137, 60, 0.15); color: #FDBA74; border: 1px solid rgba(244, 137, 60, 0.3); }
+
+        /* --- COLUNA 3: PAINEL DE AÇÃO (SALESFORCE STYLE) --- */
+        .action-panel {
+            background: var(--bg-panel);
+            padding: 40px 32px;
+            overflow-y: auto;
+            display: flex; flex-direction: column;
         }
 
-        .nav-btn:hover { color: white; background: var(--bg-glass-hover); }
-        .nav-btn:hover .nav-icon-box { background: rgba(255,255,255,0.1); color: white; }
-
-        .nav-btn.active { color: white; background: var(--bg-glass-hover); border: 1px solid var(--border-glass); }
-        .nav-btn.active .nav-icon-box { background: var(--accent-gradient); color: white; box-shadow: 0 0 15px rgba(124, 58, 237, 0.4); }
-
-        /* Conteúdo Principal */
-        main { flex: 1; padding: 40px; overflow-y: auto; }
-        .screen { display: none; max-width: 900px; margin: 0 auto; animation: fadeUp 0.4s ease; }
-        .screen.active { display: block; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* --- LISTA DE ITENS (AQUI ESTAVA O PROBLEMA) --- */
-        .list-item { 
-            display: flex !important; /* Força o alinhamento horizontal */
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 20px; 
-            background: rgba(20, 20, 25, 0.6);
-            border: 1px solid var(--border-glass);
-            border-radius: 18px;
-            margin-bottom: 12px;
+        .panel-header { margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--card-border); }
+        .panel-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+        
+        /* Formulários */
+        .form-group { margin-bottom: 24px; }
+        label { display: block; color: var(--text-secondary); margin-bottom: 10px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        input, select, textarea {
+            width: 100%;
+            background: var(--bg-absolute);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 14px 16px;
+            border-radius: var(--radius-sm);
+            font-family: 'Manrope'; font-size: 14px;
             transition: 0.2s;
         }
-        .list-item:hover { transform: translateY(-2px); border-color: rgba(124, 58, 237, 0.4); background: rgba(30, 30, 35, 0.8); }
-
-        .item-left { display: flex; align-items: center; gap: 16px; }
-        
-        .item-icon {
-            width: 48px; height: 48px;
-            border-radius: 14px;
-            background: rgba(124, 58, 237, 0.1);
-            color: #a78bfa;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 2px rgba(114, 60, 235, 0.2);
         }
 
-        .item-info strong { display: block; font-size: 1.05rem; margin-bottom: 4px; }
-        .item-info small { color: var(--text-secondary); font-size: 0.85rem; }
-
-        .item-actions { display: flex; gap: 8px; }
-
-        /* Botões de Ação (Lápis/Lixo) */
-        .action-btn { 
-            width: 40px; height: 40px; 
-            border-radius: 10px; border: 1px solid var(--border-glass);
-            background: rgba(255,255,255,0.03); color: var(--text-secondary);
-            display: flex; align-items: center; justify-content: center;
+        /* Botões */
+        .btn {
+            width: 100%; padding: 16px;
+            border-radius: var(--radius-md);
+            font-weight: 600; font-size: 14px;
             cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
         }
-        .action-btn:hover { background: rgba(255,255,255,0.1); color: white; border-color: white; }
-        .action-btn.delete:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: #f87171; }
-
-        /* Botões Principais */
-        button.primary { 
-            background: var(--accent-gradient); color: white; border: none; 
-            padding: 16px 32px; border-radius: 14px; font-weight: 600; width: 100%; 
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4); cursor: pointer;
+        .btn-primary {
+            background: var(--accent-purple); color: white; border: none;
+            box-shadow: 0 4px 20px rgba(114, 60, 235, 0.3);
         }
-        button.secondary { 
-            background: transparent; border: 1px solid var(--border-glass); color: white; 
-            padding: 8px 16px; border-radius: 10px; font-size: 0.85rem; cursor: pointer;
-        }
-
-        /* Toasts e Widgets */
-        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { padding: 16px 24px; border-radius: 16px; background: #121212; border: 1px solid var(--border-glass); color: white; display: flex; gap: 12px; align-items: center; border-left: 4px solid #7c3aed; animation: slideIn 0.3s; }
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
         
-        /* Mobile */
-        @media (max-width: 768px) {
-            .app-container { flex-direction: column; }
-            aside { position: fixed; bottom: 0; width: 100%; height: 75px; flex-direction: row; justify-content: space-around; padding: 10px; } 
-            aside h1 { display: none; }
-            .nav-btn { flex-direction: column; padding: 0; gap: 4px; justify-content: center; width: auto; background: none !important; font-size: 0.7rem; border: none !important;}
-            .nav-icon-box { width: 32px; height: 32px; margin: 0 auto; }
-            main { padding: 20px; padding-bottom: 100px; }
+        .btn-secondary {
+            background: transparent; border: 1px solid var(--card-border); color: var(--text-primary);
         }
-        
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .btn-secondary:hover { background: var(--card-hover); }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.1); color: #EF4444; border: 1px solid transparent;
+            width: auto; padding: 8px 12px; border-radius: 8px;
+        }
+        .btn-delete:hover { background: rgba(239, 68, 68, 0.2); }
+
+        /* Empty States */
+        .empty-state { text-align: center; color: var(--text-secondary); padding: 60px 0; opacity: 0.5; }
+
+        /* Toasts */
+        #toast-container { position: fixed; bottom: 32px; right: 32px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: #1a1a1a; border: 1px solid var(--card-border); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 12px; animation: slideIn 0.3s; }
+        .toast.success { border-left: 4px solid #10B981; } .toast.error { border-left: 4px solid #EF4444; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Mobile Responsive */
+        @media (max-width: 1000px) {
+            .app-grid { grid-template-columns: 80px 1fr 0px; }
+            .sidebar { padding: 20px 10px; align-items: center; }
+            .brand-text, .nav-text { display: none; }
+            .action-panel { display: none; position: fixed; right: 0; top: 0; bottom: 0; width: 100%; z-index: 50; background: var(--bg-panel); border-left: 1px solid var(--card-border); }
+            .action-panel.open { display: flex; width: 85%; box-shadow: -20px 0 50px rgba(0,0,0,0.5); }
+        }
     </style>
 </head>
 <body>
 
     <div id="toast-container"></div>
 
-    <div class="app-container">
-        <aside>
-            <h1 style="font-size:1.5rem; font-weight:800; margin-bottom:40px; display:flex; gap:10px; align-items:center;">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Storm Pro
-            </h1>
+    <div class="app-grid">
+        
+        <aside class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                    <span class="brand-text">Storm Pro</span>
+                </div>
 
-            <button class="nav-btn active" onclick="window.showScreen('disparo')">
-                <div class="nav-icon-box"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></div>
-                <span>Disparar</span>
-            </button>
-            <button class="nav-btn" onclick="window.showScreen('grupos')">
-                <div class="nav-icon-box"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
-                <span>Grupos</span>
-            </button>
-            <button class="nav-btn" onclick="window.showScreen('templates')">
-                <div class="nav-icon-box"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
-                <span>Templates</span>
-            </button>
-            <button class="nav-btn" onclick="window.showScreen('fluxos')">
-                <div class="nav-icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg></div>
-                <span>Fluxos</span>
-            </button>
+                <ul class="nav-menu">
+                    <li class="nav-item active" onclick="app.navigate('disparo', this)">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+                        <span class="nav-text">Disparar</span>
+                    </li>
+                    
+                    <li class="nav-item" onclick="app.navigate('grupos', this)">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span class="nav-text">Grupos</span>
+                    </li>
+                    
+                    <li class="nav-item" onclick="app.navigate('templates', this)">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        <span class="nav-text">Templates</span>
+                    </li>
+                    
+                    <li class="nav-item" onclick="app.navigate('fluxos', this)">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        <span class="nav-text">Fluxos</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div style="padding-top: 20px; border-top: 1px solid var(--card-border);">
+                <div style="display:flex; gap:12px; align-items:center; opacity:0.6;">
+                    <div style="width:24px; height:24px; border-radius:50%; background:#333;"></div>
+                    <span style="font-size:12px;">Matheus (CEO)</span>
+                </div>
+            </div>
         </aside>
 
-        <main>
-            <div id="disparo" class="screen active">
-                <h2 style="margin-bottom:30px; font-size:2rem; font-weight:700;">Disparo Rápido</h2>
-                <div class="glass-panel" style="padding:30px; border-radius:24px; margin-bottom:20px;">
-                    <label>Para quem enviar?</label>
-                    <select id="selectGrupoEnvio" class="glass-input"><option value="">Carregando...</option></select>
-                    <textarea id="emailsAvulsos" class="glass-input" placeholder="Ou cole e-mails aqui (um por linha)..." style="height: 80px;"></textarea>
+        <main class="main-list">
+            <header>
+                <div>
+                    <h1 id="pageTitle">Inbox</h1>
+                    <div class="subtitle" id="pageSubtitle">Gerencie suas campanhas ativas</div>
                 </div>
-                <div class="glass-panel" style="padding:30px; border-radius:24px; margin-bottom:30px;">
-                    <label>Qual mensagem?</label>
-                    <select id="selectTemplateEnvio" class="glass-input"><option value="">-- Manual --</option></select>
-                </div>
-                <button class="primary" id="btnStart">INICIAR DISPARO</button>
-            </div>
+                <button class="btn btn-secondary" style="width:auto;" onclick="app.openCreatePanel()">
+                    + Adicionar Novo
+                </button>
+            </header>
 
-            <div id="grupos" class="screen">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
-                    <h2 style="margin:0;">Grupos</h2>
-                    <button class="secondary" onclick="window.novoGrupo()">+ Novo</button>
+            <div id="contentArea" class="cards-container">
                 </div>
-                
-                <div id="listaGruposUI"></div>
-
-                <div class="glass-panel" id="formGrupo" style="display:none; padding:30px; border-radius:24px; border:1px solid #7c3aed; margin-bottom:30px;">
-                    <h3 style="margin-bottom:20px;">Novo Grupo</h3>
-                    <input type="hidden" id="grupoId">
-                    <label>Nome do Grupo</label><input type="text" id="grupoNome" class="glass-input">
-                    <label>Lista de E-mails</label><textarea id="grupoEmails" class="glass-input" style="height:150px;"></textarea>
-                    <div style="display:flex; gap:10px;">
-                        <button class="secondary" onclick="document.getElementById('formGrupo').style.display='none'">Cancelar</button>
-                        <button class="primary" onclick="window.salvarGrupo()">Salvar</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="templates" class="screen">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
-                    <h2 style="margin:0;">Templates</h2>
-                    <button class="secondary" onclick="window.novoTemplate()">+ Novo</button>
-                </div>
-                
-                <div id="listaTemplatesUI"></div>
-
-                <div class="glass-panel" id="formTemplate" style="display:none; padding:30px; border-radius:24px; border:1px solid #7c3aed; margin-bottom:30px;">
-                    <h3 style="margin-bottom:20px;">Novo Template</h3>
-                    <input type="hidden" id="tempId">
-                    <label>Nome Interno</label><input type="text" id="tempNome" class="glass-input">
-                    <label>Assunto do E-mail</label><input type="text" id="tempAssunto" class="glass-input">
-                    <label>Conteúdo HTML</label><textarea id="tempHtml" class="glass-input" style="height:200px; font-family:monospace;"></textarea>
-                    <div style="display:flex; gap:10px; margin-top:20px;">
-                        <button class="secondary" onclick="document.getElementById('formTemplate').style.display='none'">Cancelar</button>
-                        <button class="primary" onclick="window.salvarTemplate()">Salvar</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="fluxos" class="screen">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
-                    <h2 style="margin:0;">Fluxos</h2>
-                    <button class="secondary" onclick="window.novoFluxo()">+ Criar</button>
-                </div>
-                <div id="listaFluxosUI"></div>
-                <div class="glass-panel" id="formFluxo" style="display:none; padding:30px; border-radius:24px; border:1px solid #7c3aed;">
-                    <h3>Editor de Fluxo</h3>
-                    <label>Nome da Campanha</label><input type="text" id="flowNome" class="glass-input">
-                    <div id="stepsContainer" style="margin:20px 0;"></div>
-                    <button class="secondary" onclick="window.adicionarPasso()" style="width:100%; margin-bottom:20px; border-style:dashed;">+ Adicionar Passo</button>
-                    <button class="primary" onclick="window.salvarFluxo()">Salvar Fluxo</button>
-                </div>
-            </div>
         </main>
+
+        <aside class="action-panel" id="actionPanel">
+            <div id="defaultPanelContent" style="text-align:center; color:var(--text-secondary); margin-top:50%;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:0.3"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                <p style="margin-top:16px;">Selecione um item ou<br>crie um novo para editar.</p>
+            </div>
+
+            <div id="dynamicForm" style="display:none;">
+                <div class="panel-header">
+                    <div style="font-size:12px; color:var(--accent-orange); font-weight:700; margin-bottom:4px;">EDITOR</div>
+                    <div class="panel-title" id="formTitle">Novo Item</div>
+                </div>
+                <div id="formFields"></div>
+                <div style="margin-top:32px; display:flex; gap:12px;">
+                    <button class="btn btn-primary" onclick="app.saveCurrent()">Salvar Alterações</button>
+                    <button class="btn btn-secondary" onclick="app.closePanel()">Cancelar</button>
+                </div>
+            </div>
+        </aside>
+
     </div>
 
-   <script>
-        // --- FUNÇÕES DE RENDERIZAÇÃO (CARDS DESIGN) ---
+    <script>
+        // --- LÓGICA DO SISTEMA ---
+        
+        const app = {
+            currentView: 'disparo',
+            data: { grupos: [], templates: [], fluxos: [] },
+            currentItemId: null, // ID do item sendo editado no painel direito
 
-        function renderGrupos() {
-            const ui = document.getElementById('listaGruposUI');
-            // Adicionamos a classe grid-container
-            ui.className = 'grid-container'; 
+            init: async () => {
+                await app.fetchData();
+                app.navigate('disparo', document.querySelector('.nav-item.active'));
+            },
+
+            fetchData: async () => {
+                try {
+                    const [g, t, f] = await Promise.all([
+                        fetch('/api/groups').then(r => r.json()),
+                        fetch('/api/templates').then(r => r.json()),
+                        fetch('/api/flows').then(r => r.json())
+                    ]);
+                    app.data.grupos = g;
+                    app.data.templates = t;
+                    app.data.fluxos = f;
+                } catch (e) { console.error(e); }
+            },
+
+            // Navegação entre as telas
+            navigate: (view, el) => {
+                app.currentView = view;
+                
+                // Atualiza Sidebar
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                if(el) el.classList.add('active');
+
+                // Atualiza Títulos
+                const titles = {
+                    'disparo': ['Disparo Rápido', 'Envie campanhas em massa agora'],
+                    'grupos': ['Grupos de E-mail', 'Organize seus contatos e clientes'],
+                    'templates': ['Modelos de E-mail', 'Crie designs reutilizáveis'],
+                    'fluxos': ['Fluxos de Automação', 'Crie sequências temporais']
+                };
+                document.getElementById('pageTitle').innerText = titles[view][0];
+                document.getElementById('pageSubtitle').innerText = titles[view][1];
+
+                // Renderiza Lista Central
+                app.renderList();
+                
+                // Reseta Painel Direito
+                app.closePanel();
+            },
+
+            // Renderiza os Cards na Coluna do Meio
+            renderList: () => {
+                const container = document.getElementById('contentArea');
+                let html = '';
+
+                if (app.currentView === 'disparo') {
+                    // Tela de Disparo (Customizada)
+                    html = `
+                        <div class="card-item" style="cursor:default;">
+                            <div class="form-group">
+                                <label>Selecione o Grupo</label>
+                                <select id="sendGrupo">${app.data.grupos.map(g=>`<option value="${g.id}">${g.nome}</option>`).join('')}</select>
+                            </div>
+                            <div class="form-group">
+                                <label>Ou e-mails avulsos</label>
+                                <textarea id="sendAvulsos" rows="3" placeholder="email@exemplo.com"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Selecione o Template</label>
+                                <select id="sendTemplate">${app.data.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}</select>
+                            </div>
+                            <button class="btn btn-primary" onclick="app.startSending()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2Z"/></svg>
+                                Iniciar Disparo
+                            </button>
+                        </div>
+                    `;
+                } 
+                else if (app.currentView === 'grupos') {
+                    html = app.data.grupos.map(g => `
+                        <div class="card-item" onclick="app.editItem(${g.id})">
+                            <div class="card-header">
+                                <div class="card-meta">
+                                    <div class="avatar purple-gradient">G</div>
+                                    <div>
+                                        <div class="card-title">${g.nome}</div>
+                                        <div class="card-preview">${g.emails ? g.emails.length : 0} contatos</div>
+                                    </div>
+                                </div>
+                                <span class="tag orange">Lista</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                else if (app.currentView === 'templates') {
+                    html = app.data.templates.map(t => `
+                        <div class="card-item" onclick="app.editItem(${t.id})">
+                            <div class="card-header">
+                                <div class="card-meta">
+                                    <div class="avatar" style="background:#333"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg></div>
+                                    <div>
+                                        <div class="card-title">${t.nome}</div>
+                                        <div class="card-preview">${t.assunto}</div>
+                                    </div>
+                                </div>
+                                <span class="tag purple">HTML</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                else if (app.currentView === 'fluxos') {
+                    html = app.data.fluxos.map(f => `
+                        <div class="card-item" onclick="app.editItem(${f.id})">
+                            <div class="card-header">
+                                <div class="card-meta">
+                                    <div class="avatar" style="background:#22c55e"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+                                    <div>
+                                        <div class="card-title">${f.nome}</div>
+                                        <div class="card-preview">${f.steps.length} passos de automação</div>
+                                    </div>
+                                </div>
+                                <span class="tag orange">Auto</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                container.innerHTML = html || '<div class="empty-state">Nenhum item encontrado.</div>';
+            },
+
+            // --- LÓGICA DO PAINEL DIREITO (SALESFORCE VIEW) ---
             
-            if(!cache.grupos.length) { 
-                ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum grupo criado.</div>'; 
-                return; 
+            openCreatePanel: () => {
+                if(app.currentView === 'disparo') return; // Sem criação na tela de disparo
+                app.currentItemId = null; // Modo Criação
+                app.renderForm();
+            },
+
+            editItem: (id) => {
+                app.currentItemId = id; // Modo Edição
+                app.renderForm();
+            },
+
+            closePanel: () => {
+                document.getElementById('defaultPanelContent').style.display = 'block';
+                document.getElementById('dynamicForm').style.display = 'none';
+                // Mobile
+                document.querySelector('.action-panel').classList.remove('open');
+            },
+
+            renderForm: () => {
+                const container = document.getElementById('formFields');
+                const title = document.getElementById('formTitle');
+                let fields = '';
+                
+                // Abre o painel
+                document.getElementById('defaultPanelContent').style.display = 'none';
+                document.getElementById('dynamicForm').style.display = 'block';
+                // Mobile trigger
+                document.querySelector('.action-panel').classList.add('open');
+
+                if (app.currentView === 'grupos') {
+                    const item = app.currentItemId ? app.data.grupos.find(x => x.id === app.currentItemId) : { nome: '', emails: [] };
+                    title.innerText = app.currentItemId ? 'Editar Grupo' : 'Novo Grupo';
+                    fields = `
+                        <div class="form-group"><label>Nome do Grupo</label><input id="f_nome" value="${item.nome}"></div>
+                        <div class="form-group"><label>Lista de E-mails</label><textarea id="f_emails" rows="10" placeholder="Um por linha...">${item.emails ? item.emails.join('\n') : ''}</textarea></div>
+                    `;
+                }
+                else if (app.currentView === 'templates') {
+                    const item = app.currentItemId ? app.data.templates.find(x => x.id === app.currentItemId) : { nome: '', assunto: '', html: '' };
+                    title.innerText = app.currentItemId ? 'Editar Template' : 'Novo Template';
+                    fields = `
+                        <div class="form-group"><label>Nome Interno</label><input id="f_nome" value="${item.nome}"></div>
+                        <div class="form-group"><label>Assunto</label><input id="f_assunto" value="${item.assunto}"></div>
+                        <div class="form-group"><label>HTML do E-mail</label><textarea id="f_html" rows="15" style="font-family:monospace; font-size:12px;">${item.html}</textarea></div>
+                        <div style="display:flex; gap:10px;"><button class="btn btn-secondary" style="padding:8px" onclick="app.insertTag('<img src=...>')">IMG</button><button class="btn btn-secondary" style="padding:8px" onclick="app.insertTag('<a href=...>')">LINK</button></div>
+                    `;
+                }
+                else if (app.currentView === 'fluxos') {
+                    const item = app.currentItemId ? app.data.fluxos.find(x => x.id === app.currentItemId) : { nome: '', steps: [] };
+                    title.innerText = app.currentItemId ? 'Editar Fluxo' : 'Novo Fluxo';
+                    
+                    // Renderizador de passos simplificado para o exemplo
+                    const stepsHtml = (item.steps || []).map((s, i) => `
+                        <div style="background:#151515; padding:10px; border-radius:8px; margin-bottom:8px; border:1px dashed #333;">
+                            <div style="font-size:11px; color:#666; margin-bottom:4px;">PASSO ${i+1}</div>
+                            <div style="font-weight:600;">Template ID: ${s.templateId}</div>
+                            <div style="font-size:12px;">Espera: ${s.delay}h</div>
+                        </div>
+                    `).join('');
+
+                    fields = `
+                        <div class="form-group"><label>Nome da Campanha</label><input id="f_nome" value="${item.nome}"></div>
+                        <label>Sequência (Simplificada)</label>
+                        ${stepsHtml}
+                        <div style="padding:10px; background:rgba(244, 137, 60, 0.1); border:1px solid rgba(244, 137, 60, 0.3); border-radius:8px; font-size:12px; color:#FDBA74; margin-top:10px;">
+                            ⚠ Para editar passos complexos, delete e recrie o fluxo. (Versão Lite)
+                        </div>
+                        <input type="hidden" id="f_steps_json" value='${JSON.stringify(item.steps || [])}'>
+                    `;
+                }
+
+                // Adiciona botão de excluir se for edição
+                if(app.currentItemId) {
+                    fields += `<div style="margin-top:40px; border-top:1px solid var(--card-border); padding-top:20px;"><button class="btn btn-delete" onclick="app.deleteCurrent()">Excluir Item</button></div>`;
+                }
+
+                container.innerHTML = fields;
+            },
+
+            // CRUD Operations
+            saveCurrent: async () => {
+                const id = app.currentItemId;
+                const method = id ? 'PUT' : 'POST';
+                let body = {};
+
+                if (app.currentView === 'grupos') {
+                    body = {
+                        id: id,
+                        nome: document.getElementById('f_nome').value,
+                        emails: document.getElementById('f_emails').value.split('\n').map(e=>e.trim()).filter(e=>e.includes('@'))
+                    };
+                } else if (app.currentView === 'templates') {
+                    body = {
+                        id: id,
+                        nome: document.getElementById('f_nome').value,
+                        assunto: document.getElementById('f_assunto').value,
+                        html: document.getElementById('f_html').value
+                    };
+                } else if (app.currentView === 'fluxos') {
+                    // Simplificação: Salvando apenas nome no modo edição simples
+                    body = {
+                        id: id,
+                        nome: document.getElementById('f_nome').value,
+                        steps: JSON.parse(document.getElementById('f_steps_json').value)
+                    };
+                }
+
+                await fetch(`/api/${app.currentView}`, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+
+                app.showToast('Salvo com sucesso!', 'success');
+                app.fetchData().then(() => app.renderList());
+            },
+
+            deleteCurrent: async () => {
+                if(!confirm("Tem certeza?")) return;
+                await fetch(`/api/${app.currentView}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: app.currentItemId })
+                });
+                app.showToast('Item excluído.', 'success');
+                app.fetchData().then(() => {
+                    app.renderList();
+                    app.closePanel();
+                });
+            },
+
+            // Helpers
+            insertTag: (tag) => {
+                document.getElementById('f_html').value += tag;
+            },
+
+            showToast: (msg, type) => {
+                const t = document.createElement('div');
+                t.className = `toast ${type}`;
+                t.innerHTML = `<span>${msg}</span>`;
+                document.getElementById('toast-container').appendChild(t);
+                setTimeout(() => t.remove(), 3000);
+            },
+
+            startSending: async () => {
+                // Lógica de disparo mantida
+                const gid = document.getElementById('sendGrupo').value;
+                const tid = document.getElementById('sendTemplate').value;
+                const avulsos = document.getElementById('sendAvulsos').value;
+                
+                let list = [];
+                if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = [...g.emails]; }
+                if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.includes('@'))];
+                list = [...new Set(list)];
+
+                if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
+                if(!confirm(`Disparar para ${list.length} pessoas?`)) return;
+
+                const tmpl = app.data.templates.find(x=>x.id==tid);
+                const subj = tmpl ? tmpl.assunto : 'Aviso';
+                const html = tmpl ? tmpl.html : 'Olá';
+
+                app.showToast('Iniciando envio...', 'success');
+                
+                for(let i=0; i<list.length; i+=5) {
+                    const batch = list.slice(i, i+5);
+                    await Promise.all(batch.map(email => 
+                        fetch('/api/send', {
+                            method:'POST', headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({email, subject:subj, html})
+                        })
+                    ));
+                    await new Promise(r=>setTimeout(r, 1000));
+                }
+                app.showToast('Envio concluído!', 'success');
             }
-            
-            ui.innerHTML = cache.grupos.map((g, index) => {
-                // Alterna estilos para dar vida (igual a ref)
-                const isHighlight = index === 0; // O primeiro destaque
-                const cardClass = isHighlight ? 'dashboard-card highlight' : 'dashboard-card';
-                const pillClass = isHighlight ? 'pill yellow' : 'pill dark';
-                
-                return `
-                <div class="${cardClass}">
-                    <div class="card-top">
-                        <div class="card-icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn" onclick="window.editarGrupo(${g.id})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                            <button class="icon-btn delete" onclick="window.deletarGrupo(${g.id})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <h3>${g.nome}</h3>
-                        <p>${g.emails ? g.emails.length : 0} contatos ativos</p>
-                        <div class="card-tags">
-                            <span class="${pillClass}">ATIVO</span>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        function renderTemplates() {
-            const ui = document.getElementById('listaTemplatesUI');
-            ui.className = 'grid-container';
-
-            if(!cache.templates.length) { ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum template.</div>'; return; }
-
-            ui.innerHTML = cache.templates.map((t, index) => {
-                // Alterna gradientes para diferenciar
-                const isHighlight = index === 1; 
-                const cardStyle = isHighlight ? 'background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%); border:none;' : '';
-                const titleColor = isHighlight ? 'color:white' : '';
-                
-                return `
-                <div class="dashboard-card" style="${cardStyle}">
-                    <div class="card-top">
-                        <div class="card-icon" style="${isHighlight ? 'background:rgba(255,255,255,0.2); color:white;' : ''}">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn" onclick="window.editarTemplate(${t.id})">✎</button>
-                            <button class="icon-btn delete" onclick="window.deletarTemplate(${t.id})">✕</button>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <h3 style="${titleColor}">${t.nome}</h3>
-                        <p style="${titleColor ? 'color:rgba(255,255,255,0.8)' : ''}">${t.assunto}</p>
-                        <div class="card-tags">
-                            <span class="pill dark">HTML</span>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        function renderFluxos() {
-            const ui = document.getElementById('listaFluxosUI');
-            ui.className = 'grid-container';
-            
-            if(!cache.fluxos.length) { ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum fluxo.</div>'; return; }
-
-            ui.innerHTML = cache.fluxos.map(f => `
-                <div class="dashboard-card">
-                    <div class="card-top">
-                        <div class="card-icon" style="background: rgba(16, 185, 129, 0.1); color:#10b981;">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn delete" onclick="window.deletarFluxo(${f.id})">✕</button>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <h3>${f.nome}</h3>
-                        <p>${f.steps.length} passos de automação</p>
-                        <div class="card-tags">
-                            ${f.steps.map(s => `<span class="pill purple">+${s.delay}h</span>`).join('')}
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // --- SISTEMA ---
-        function showToast(msg, type='info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            // Ícones SVG no toast
-            let icon = type==='success' ? '✅' : type==='error' ? '❌' : 'ℹ️';
-            toast.innerHTML = `<span style="font-size:1.2rem">${icon}</span><span>${msg}</span>`;
-            if(type==='success') toast.style.borderLeftColor = '#4ade80';
-            if(type==='error') toast.style.borderLeftColor = '#f87171';
-            container.appendChild(toast);
-            setTimeout(()=>toast.remove(), 3000);
-        }
-
-        let cache = { grupos: [], templates: [], fluxos: [] };
-        let currentFlowSteps = [];
-
-        window.showScreen = (id) => {
-            document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            const map = {'disparo':0, 'grupos':1, 'templates':2, 'fluxos':3};
-            document.querySelectorAll('.nav-btn')[map[id]].classList.add('active');
-            carregarDados();
         };
 
-        async function carregarDados() {
-            try {
-                const g = await fetch('/api/groups'); cache.grupos = await g.json();
-                const t = await fetch('/api/templates'); cache.templates = await t.json();
-                const f = await fetch('/api/flows'); cache.fluxos = await f.json();
-                renderAll();
-            } catch(e) { console.error(e); }
-        }
+        // Inicializa
+        app.init();
 
-        function renderAll() { renderGrupos(); renderTemplates(); renderFluxos(); populateSelects(); }
-        
-        function populateSelects() {
-            const opts = '<option value="">-- Selecione --</option>' + cache.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
-            document.getElementById('selectTemplateEnvio').innerHTML = opts;
-            const gOpts = '<option value="">-- Selecione --</option>' + cache.grupos.map(g=>`<option value="${g.id}">${g.nome}</option>`).join('');
-            document.getElementById('selectGrupoEnvio').innerHTML = gOpts;
-        }
-
-        // CRUD (Mantenha o mesmo do anterior, está funcionando bem)
-        window.novoGrupo = () => { document.getElementById('grupoId').value=''; document.getElementById('grupoNome').value=''; document.getElementById('grupoEmails').value=''; document.getElementById('formGrupo').style.display='block'; }
-        window.editarGrupo = (id) => { const g=cache.grupos.find(x=>x.id===id); if(g){ document.getElementById('grupoId').value=g.id; document.getElementById('grupoNome').value=g.nome; document.getElementById('grupoEmails').value=g.emails.join('\n'); document.getElementById('formGrupo').style.display='block'; } }
-        window.salvarGrupo = async () => {
-            const id=document.getElementById('grupoId').value, nome=document.getElementById('grupoNome').value, emails=document.getElementById('grupoEmails').value.split('\n').map(e=>e.trim()).filter(e=>e.includes('@'));
-            if(!nome || !emails.length) return showToast('Preencha tudo', 'error');
-            await fetch('/api/groups', { method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, nome, emails}) });
-            document.getElementById('formGrupo').style.display='none'; showToast('Salvo!', 'success'); carregarDados();
-        }
-        window.deletarGrupo = async (id) => { if(confirm('Apagar?')) { await fetch('/api/groups', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})}); showToast('Apagado', 'success'); carregarDados(); } }
-
-        window.novoTemplate = () => { document.getElementById('tempId').value=''; document.getElementById('tempNome').value=''; document.getElementById('tempAssunto').value=''; document.getElementById('tempHtml').value=''; document.getElementById('formTemplate').style.display='block'; }
-        window.editarTemplate = (id) => { const t=cache.templates.find(x=>x.id===id); if(t){ document.getElementById('tempId').value=t.id; document.getElementById('tempNome').value=t.nome; document.getElementById('tempAssunto').value=t.assunto; document.getElementById('tempHtml').value=t.html; document.getElementById('formTemplate').style.display='block'; } }
-        window.salvarTemplate = async () => {
-            const id=document.getElementById('tempId').value, nome=document.getElementById('tempNome').value, assunto=document.getElementById('tempAssunto').value, html=document.getElementById('tempHtml').value;
-            if(!nome || !assunto) return showToast('Preencha tudo', 'error');
-            await fetch('/api/templates', { method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, nome, assunto, html}) });
-            document.getElementById('formTemplate').style.display='none'; showToast('Salvo!', 'success'); carregarDados();
-        }
-        window.deletarTemplate = async (id) => { if(confirm('Apagar?')) { await fetch('/api/templates', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})}); showToast('Apagado', 'success'); carregarDados(); } }
-
-        // FLUXOS
-        window.novoFluxo = () => { currentFlowSteps=[{templateId:'', delay:0}]; document.getElementById('flowNome').value=''; renderStepsEditor(); document.getElementById('formFluxo').style.display='block'; }
-        window.adicionarPasso = () => { currentFlowSteps.push({templateId:'', delay:24}); renderStepsEditor(); }
-        window.removerPasso = (i) => { currentFlowSteps.splice(i,1); renderStepsEditor(); }
-        window.updateStepData = (i, f, v) => { currentFlowSteps[i][f]=v; }
-        function renderStepsEditor() {
-            const opts='<option value="">Selecione...</option>'+cache.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
-            document.getElementById('stepsContainer').innerHTML = currentFlowSteps.map((s,i)=>`
-                <div style="position:relative; padding-left:30px; margin-bottom:20px; border-left:2px dashed rgba(255,255,255,0.1);">
-                    <div style="position:absolute; left:-9px; top:20px; width:16px; height:16px; border-radius:50%; background:#09090b; border:2px solid #8b5cf6;"></div>
-                    <div style="padding:20px; display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.05); border-radius:12px;">
-                        <div style="font-family:'Syne'; font-size:1.5rem; opacity:0.2;">${i+1}</div>
-                        <div style="flex:1">
-                            <label>Modelo:</label><select class="glass-input" style="margin-bottom:10px;" onchange="window.updateStepData(${i},'templateId',this.value)">${opts.replace(`value="${s.templateId}"`,`value="${s.templateId}" selected`)}</select>
-                            <label>Esperar (Horas):</label><input type="number" class="glass-input" value="${s.delay}" style="margin-bottom:0;" onchange="window.updateStepData(${i},'delay',this.value)">
-                        </div>
-                        <button class="icon-btn delete" onclick="window.removerPasso(${i})">X</button>
-                    </div>
-                </div>`).join('');
-        }
-        window.salvarFluxo = async () => {
-            const nome=document.getElementById('flowNome').value; if(!nome||currentFlowSteps.some(s=>!s.templateId)) return showToast('Erro', 'error');
-            await fetch('/api/flows', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nome, steps:currentFlowSteps})});
-            document.getElementById('formFluxo').style.display='none'; showToast('Salvo', 'success'); carregarDados();
-        }
-        window.deletarFluxo = async (id) => { if(confirm('Apagar?')) { await fetch('/api/flows', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})}); carregarDados(); } }
-
-        // DISPARO (MANTÉM O MESMO DO ÚLTIMO, FUNCIONA BEM)
-        document.getElementById('btnStart').addEventListener('click', async () => {
-            const gid=document.getElementById('selectGrupoEnvio').value, tid=document.getElementById('selectTemplateEnvio').value, avulsos=document.getElementById('emailsAvulsos').value;
-            let list=[]; if(gid){const g=cache.grupos.find(x=>x.id==gid); if(g) list=[...g.emails];} if(avulsos) list=[...list, ...avulsos.split('\n').filter(e=>e.includes('@'))]; list=[...new Set(list)];
-            if(!list.length) return showToast('Sem emails', 'error');
-            let subj='', html=''; if(tid){const t=cache.templates.find(x=>x.id==tid); subj=t.assunto; html=t.html;} else {subj='Aviso'; html='<p>Olá</p>';} 
-            if(!confirm(`Enviar para ${list.length}?`)) return;
-
-            const btn=document.getElementById('btnStart'); btn.disabled=true; btn.innerText = "ENVIANDO...";
-            let suc=0, err=0;
-            for(let i=0; i<list.length; i+=5) {
-                const batch=list.slice(i, i+5);
-                await Promise.all(batch.map(e=>fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e, subject:subj, html})}).then(r=>r.ok?suc++:err++)));
-                await new Promise(r=>setTimeout(r,1000));
-            }
-            showToast(`Sucesso: ${suc} | Erros: ${err}`, 'success'); btn.disabled=false; btn.innerText = "INICIAR DISPARO";
-        });
-
-        carregarDados();
     </script>
 </body>
 </html>
