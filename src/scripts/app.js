@@ -4,7 +4,7 @@ const app = {
     currentView: 'disparo',
     data: { grupos: [], templates: [], fluxos: [], settings: [] },
     currentItemId: null,
-    tempSteps: [], // Passos temporários da edição
+    tempSteps: [],
 
     apiMap: {
         'grupos': 'groups',
@@ -45,7 +45,7 @@ const app = {
         
         const titles = {
             'disparo': ['Disparo Rápido', 'Envie campanhas em massa'],
-            'grupos': ['Grupos', 'Gerencie seus contatos'],
+            'grupos': ['Grupos', 'Importe e gerencie contatos'],
             'templates': ['Templates', 'Modelos de e-mail'],
             'fluxos': ['Fluxos', 'Automação de envio'],
             'config': ['Servidores SMTP', 'Configure seus canais de envio']
@@ -132,14 +132,37 @@ const app = {
         document.getElementById('dynamicForm').style.display = 'block';
         document.getElementById('actionPanel').classList.add('open');
 
-        // --- EDITOR DE FLUXOS (COM MINUTOS) ---
-        if (app.currentView === 'fluxos') {
+        // --- EDITOR DE GRUPOS (COM IMPORTAÇÃO) ---
+        if (app.currentView === 'grupos') {
+            const item = app.currentItemId ? app.data.grupos.find(x => x.id === app.currentItemId) : { nome: '', emails: [] };
+            title.innerText = 'Editor de Grupo';
+            fields = `
+                <div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div>
+                
+                <div style="margin-bottom:20px; padding:15px; border:1px dashed rgba(255,255,255,0.2); border-radius:12px; background:rgba(255,255,255,0.02);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <label style="margin:0; color:#a78bfa;">📂 Importar Planilha (CSV)</label>
+                        <a href="#" onclick="window.app.downloadTemplate()" style="font-size:11px; color:#fff; text-decoration:underline;">Baixar Modelo</a>
+                    </div>
+                    <input type="file" id="importFile" accept=".csv, .txt" class="glass-input" style="margin-bottom:10px; padding:10px;">
+                    <button class="btn btn-secondary" onclick="window.app.processImport()">Ler Arquivo</button>
+                </div>
+
+                <div class="form-group">
+                    <label>E-mails (Editável)</label>
+                    <textarea id="f_emails" rows="10" placeholder="cliente@exemplo.com">${item.emails ? item.emails.join('\n') : ''}</textarea>
+                    <small style="color:#666; font-size:11px;">Total de linhas: <span id="emailCount">${item.emails ? item.emails.length : 0}</span></small>
+                </div>
+            `;
+        }
+        
+        else if (app.currentView === 'fluxos') {
             const item = app.currentItemId ? app.data.fluxos.find(x => x.id === app.currentItemId) : { nome: '', steps: [] };
             title.innerText = app.currentItemId ? 'Editar Automação' : 'Nova Automação';
             app.tempSteps = item.steps ? JSON.parse(JSON.stringify(item.steps)) : [];
 
             fields = `
-                <div class="form-group"><label>Nome da Campanha</label><input id="f_nome" value="${item.nome}" placeholder="Ex: Onboarding"></div>
+                <div class="form-group"><label>Nome da Campanha</label><input id="f_nome" value="${item.nome}"></div>
                 <div style="border-top:1px solid rgba(255,255,255,0.1); margin:20px 0; padding-top:10px;">
                     <label style="color:#a78bfa; margin-bottom:15px;">LINHA DO TEMPO</label>
                     <div id="stepsList"></div>
@@ -148,15 +171,10 @@ const app = {
             `;
             setTimeout(() => app.renderStepsList(), 50);
         }
-        // --- OUTROS ---
         else if (app.currentView === 'config') {
             const item = app.currentItemId ? app.data.settings.find(x => x.id === app.currentItemId) : { name:'', smtp_host:'', smtp_port:'587', smtp_user:'', smtp_pass:'', sender_email:'', smtp_secure:false };
             title.innerText = 'Editar SMTP';
             fields = `<div class="form-group"><label>Nome</label><input id="c_name" value="${item.name||''}"></div><div class="form-group"><label>Host</label><input id="c_host" value="${item.smtp_host||''}"></div><div class="form-group"><label>Porta</label><input type="number" id="c_port" value="${item.smtp_port||587}"></div><div class="form-group"><label>User</label><input id="c_user" value="${item.smtp_user||''}"></div><div class="form-group"><label>Senha</label><input type="text" id="c_pass" value="${item.smtp_pass||''}"></div><div class="form-group"><label>Remetente</label><input id="c_sender" value="${item.sender_email||''}"></div><div class="form-group"><label>SSL</label><select id="c_secure"><option value="false" ${!item.smtp_secure?'selected':''}>Não</option><option value="true" ${item.smtp_secure?'selected':''}>Sim</option></select></div>`;
-        }
-        else if (app.currentView === 'grupos') {
-            const item = app.currentItemId ? app.data.grupos.find(x => x.id === app.currentItemId) : { nome: '', emails: [] };
-            title.innerText = 'Grupo'; fields = `<div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div><div class="form-group"><label>E-mails</label><textarea id="f_emails" rows="10">${item.emails ? item.emails.join('\n') : ''}</textarea></div>`;
         }
         else if (app.currentView === 'templates') {
             const item = app.currentItemId ? app.data.templates.find(x => x.id === app.currentItemId) : { nome: '', assunto: '', html: '' };
@@ -167,16 +185,59 @@ const app = {
         container.innerHTML = fields;
     },
 
-    // --- FUNÇÕES VISUAIS DO EDITOR DE FLUXO ---
+    // --- IMPORTAÇÃO DE CSV ---
+    downloadTemplate: () => {
+        const csvContent = "data:text/csv;charset=utf-8,email\ncliente1@exemplo.com\ncliente2@exemplo.com";
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "modelo_importacao_nicopel.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    },
+
+    processImport: () => {
+        const input = document.getElementById('importFile');
+        if (!input.files || !input.files[0]) return app.showToast("Selecione um arquivo .csv", "error");
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            // Separa por quebra de linha ou vírgula
+            const rawEmails = text.split(/[\n,;]+/);
+            
+            // Filtra e limpa
+            const validEmails = rawEmails
+                .map(email => email.trim())
+                .filter(email => email.includes('@') && !email.includes('email')); // Remove cabeçalho se tiver
+
+            const textArea = document.getElementById('f_emails');
+            const currentVal = textArea.value.trim();
+            
+            // Adiciona aos existentes ou substitui
+            if(currentVal) {
+                textArea.value = currentVal + '\n' + validEmails.join('\n');
+            } else {
+                textArea.value = validEmails.join('\n');
+            }
+            
+            // Atualiza contador
+            const total = document.getElementById('f_emails').value.split('\n').filter(e=>e.trim()).length;
+            document.getElementById('emailCount').innerText = total;
+
+            app.showToast(`${validEmails.length} e-mails importados!`, "success");
+        };
+        reader.readAsText(input.files[0]);
+    },
+
+    // --- FUNÇÕES DE FLUXO ---
     renderStepsList: () => {
         const listDiv = document.getElementById('stepsList');
         if(!listDiv) return;
         const html = app.tempSteps.map((step, index) => {
             const templateOptions = `<option value="">Selecione...</option>` + app.data.templates.map(t => `<option value="${t.id}" ${t.id == step.templateId ? 'selected' : ''}>${t.nome}</option>`).join('');
-            
-            // SELETOR DE UNIDADE (MINUTOS/HORAS)
             const unit = step.unit || 'hours'; 
-            
             return `
             <div style="position:relative; padding-left:20px; margin-bottom:20px; border-left: 2px solid #333;">
                 <div style="position:absolute; left:-6px; top:0; width:10px; height:10px; border-radius:50%; background:${index===0 ? '#10b981' : '#7c3aed'};"></div>
@@ -209,7 +270,7 @@ const app = {
     removeStep: (i) => { app.tempSteps.splice(i, 1); app.renderStepsList(); },
     updateStep: (i, f, v) => { app.tempSteps[i][f] = v; },
 
-    // --- SALVAR E DELETAR ---
+    // --- SALVAR ---
     saveCurrent: async () => {
         const id = app.currentItemId;
         const method = id ? 'PUT' : 'POST';
@@ -223,8 +284,12 @@ const app = {
         else if (app.currentView === 'config') {
             body = { id, name: document.getElementById('c_name').value, host: document.getElementById('c_host').value, port: document.getElementById('c_port').value, user: document.getElementById('c_user').value, pass: document.getElementById('c_pass').value, sender: document.getElementById('c_sender').value, secure: document.getElementById('c_secure').value === "true" };
         }
-        else if (app.currentView === 'grupos') { body = { id, nome: document.getElementById('f_nome').value, emails: document.getElementById('f_emails').value.split('\n').map(e=>e.trim()).filter(e=>e.includes('@')) }; } 
-        else if (app.currentView === 'templates') { body = { id, nome: document.getElementById('f_nome').value, assunto: document.getElementById('f_assunto').value, html: document.getElementById('f_html').value }; }
+        else if (app.currentView === 'grupos') {
+            body = { id, nome: document.getElementById('f_nome').value, emails: document.getElementById('f_emails').value.split('\n').map(e=>e.trim()).filter(e=>e.includes('@')) };
+        } 
+        else if (app.currentView === 'templates') {
+            body = { id, nome: document.getElementById('f_nome').value, assunto: document.getElementById('f_assunto').value, html: document.getElementById('f_html').value };
+        }
 
         const endpoint = app.apiMap[app.currentView];
         try {
@@ -244,7 +309,6 @@ const app = {
         } catch(e) { app.showToast('Erro.', 'error'); }
     },
 
-    // --- EXECUÇÃO DO FLUXO ---
     iniciarFluxo: async (flowId) => {
         const choice = prompt("INICIAR AUTOMAÇÃO:\n\n1. ID do Grupo\n2. E-mail Único\n\nDigite:");
         if(!choice) return;
