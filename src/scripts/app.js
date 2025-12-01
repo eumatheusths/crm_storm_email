@@ -5,7 +5,7 @@ const app = {
     data: { grupos: [], templates: [], fluxos: [], settings: [] },
     currentItemId: null,
 
-    // MAPA DE API (IMPORTANTE PARA EVITAR ERRO 404)
+    // TRADUTOR DE ROTAS (Backend <-> Frontend)
     apiMap: {
         'grupos': 'groups',
         'templates': 'templates',
@@ -62,7 +62,7 @@ const app = {
         app.renderList();
         app.closePanel();
         
-        if (view === 'config') app.loadConfig();
+        if (view === 'config') app.renderForm(); // Config já abre no form direto se quiser, ou lista
     },
 
     renderList: () => {
@@ -72,9 +72,8 @@ const app = {
 
         if (app.currentView === 'disparo') {
             const smtps = app.data.settings && app.data.settings.length ? app.data.settings : [];
-            
-            // Se não tiver SMTP, avisa
             let smtpOptions = `<option value="">-- Selecione --</option>`;
+            
             if (smtps.length === 0) {
                 smtpOptions = `<option value="">⚠️ Configure um SMTP na aba Configurações</option>`;
             } else {
@@ -108,7 +107,7 @@ const app = {
             `;
         } 
         else if (app.currentView === 'config') {
-            if(!app.data.settings.length) html = '<div class="empty-state">Nenhum servidor configurado. Adicione um novo.</div>';
+            if(!app.data.settings.length) html = '<div class="empty-state">Nenhum servidor configurado. Adicione um novo no painel ao lado ou clique em "+ Adicionar Novo".</div>';
             else html = app.data.settings.map(s => `
                 <div class="card-item" onclick="window.app.editItem(${s.id})">
                     <div class="card-header">
@@ -145,14 +144,29 @@ const app = {
             `).join('');
         }
         else if (app.currentView === 'fluxos') {
-            html = app.data.fluxos.map(f => `
-                <div class="card-item" onclick="window.app.editItem(${f.id})">
+            // Adiciona botão de processamento
+            const processBtn = `
+                <div style="margin-bottom:20px; display:flex; justify-content:flex-end;">
+                    <button class="btn btn-primary" style="width:auto; background:var(--accent-orange); border:none;" onclick="window.app.processQueue()">
+                        ⚙️ Processar Fila Agora
+                    </button>
+                </div>
+            `;
+
+            const list = app.data.fluxos.map(f => `
+                <div class="card-item" style="${f.active ? 'border-color:#10b981;' : ''}">
                     <div class="card-header">
                         <div class="card-meta"><div class="avatar" style="background:#22c55e">A</div><div><div class="card-title">${f.nome}</div><div class="card-preview">${f.steps ? f.steps.length : 0} passos</div></div></div>
-                        <span class="tag orange">Auto</span>
+                        <span class="tag orange">${f.active ? 'ATIVO' : 'PARADO'}</span>
+                    </div>
+                    <div style="margin-top:10px; display:flex; gap:10px;">
+                        <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.editItem(${f.id})">EDITAR</button>
+                        <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.iniciarFluxo(${f.id})">▶ INICIAR COM GRUPO</button>
                     </div>
                 </div>
             `).join('');
+            
+            html = processBtn + (list || '<div class="empty-state">Sem fluxos.</div>');
         }
 
         container.innerHTML = html;
@@ -213,7 +227,25 @@ const app = {
         else if (app.currentView === 'fluxos') {
             const item = app.currentItemId ? app.data.fluxos.find(x => x.id === app.currentItemId) : { nome: '', steps: [] };
             title.innerText = 'Editor de Fluxo';
-            fields = `<div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div><input type="hidden" id="f_steps_json" value='${JSON.stringify(item.steps||[])}'><div style="padding:10px; background:#222; border-radius:8px; font-size:12px; color:#aaa;">Edição simplificada. Delete para recriar.</div>`;
+            
+            // Passos do Fluxo
+            const stepsHtml = (item.steps || []).map((s, i) => `
+                <div style="background:#151515; padding:10px; border-radius:8px; margin-bottom:8px; border:1px dashed #333;">
+                    <div style="font-size:11px; color:#666; margin-bottom:4px;">PASSO ${i+1}</div>
+                    <div style="font-weight:600;">Template ID: ${s.templateId}</div>
+                    <div style="font-size:12px;">Espera: ${s.delay}h</div>
+                </div>
+            `).join('');
+
+            fields = `
+                <div class="form-group"><label>Nome da Campanha</label><input id="f_nome" value="${item.nome}"></div>
+                <label>Sequência (Modo Leitura)</label>
+                ${stepsHtml || '<div style="opacity:0.5; font-size:12px;">Nenhum passo.</div>'}
+                <div style="padding:10px; background:rgba(244,137,60,0.1); border:1px solid rgba(244,137,60,0.3); border-radius:8px; font-size:12px; color:#FDBA74; margin-top:10px;">
+                    ⚠ Para editar os passos, delete este fluxo e crie um novo.
+                </div>
+                <input type="hidden" id="f_steps_json" value='${JSON.stringify(item.steps || [])}'>
+            `;
         }
 
         if(app.currentItemId) {
@@ -281,138 +313,7 @@ const app = {
         } catch(e) { app.showToast('Erro ao excluir.', 'error'); }
     },
 
-    startSending: async () => {
-        const smtpId = document.getElementById('sendSmtp').value;
-        const gid = document.getElementById('sendGrupo').value;
-        const tid = document.getElementById('sendTemplate').value;
-        const avulsos = document.getElementById('sendAvulsos').value;
-        
-        if(!smtpId) return app.showToast('Selecione um Servidor SMTP!', 'error');
-
-        let list = [];
-        if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = [...g.emails]; }
-        if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.includes('@'))];
-        list = [...new Set(list)];
-
-        if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
-        if(!confirm(`Enviar para ${list.length} pessoas?`)) return;
-
-        const tmpl = app.data.templates.find(x=>x.id==tid);
-        const subj = tmpl ? tmpl.assunto : 'Aviso';
-        const html = tmpl ? tmpl.html : 'Olá';
-
-        app.showToast(`Iniciando envio para ${list.length} contatos...`, 'success');
-        const btn = document.getElementById('btnStart');
-        btn.disabled = true; 
-        btn.innerText = "ENVIANDO...";
-        
-        let successCount = 0;
-        let errorCount = 0;
-        let lastError = "";
-
-        // Envia em lotes de 2 para não sobrecarregar
-        for(let i=0; i<list.length; i+=2) {
-            const batch = list.slice(i, i+2);
-            
-            const promises = batch.map(async (email) => {
-                try {
-                    const res = await fetch('/api/send', {
-                        method:'POST', 
-                        headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({email, subject:subj, html, smtpId})
-                    });
-                    const data = await res.json();
-                    
-                    if (res.ok) {
-                        successCount++;
-                    } else {
-                        errorCount++;
-                        console.error("Falha no envio:", data.error);
-                        lastError = data.error; // Guarda o erro pra mostrar pro usuário
-                    }
-                } catch (e) {
-                    errorCount++;
-                    lastError = "Erro de conexão";
-                }
-            });
-
-            await Promise.all(promises);
-            // Delay para evitar bloqueio do servidor SMTP (1 segundo)
-            await new Promise(r=>setTimeout(r, 1000));
-        }
-
-        btn.disabled = false; 
-        btn.innerText = "INICIAR DISPARO";
-
-        if (errorCount > 0) {
-            alert(`Envio finalizado com ERROS.\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMotivo da última falha: ${lastError}`);
-        } else {
-            app.showToast(`Envio concluído! ${successCount} enviados.`, 'success');
-        }
-    },
-
-    showToast: (msg, type) => {
-        const t = document.createElement('div');
-        t.className = `toast ${type || ''}`;
-        t.innerHTML = `<span>${msg}</span>`;
-        document.getElementById('toast-container').appendChild(t);
-        setTimeout(() => t.remove(), 3000);
-    }
-};
-
-document.addEventListener('DOMContentLoaded', app.init);
-
-// ATUALIZAÇÃO PARCIAL DO src/scripts/app.js
-
-// 1. Atualize a função renderFluxos dentro do objeto app:
-// ...
-        renderFluxos: () => {
-            const ui = document.getElementById('listaFluxosUI');
-            
-            // Botão global de processamento (O motor do sistema)
-            const processButton = `
-                <div style="margin-bottom:20px; display:flex; justify-content:flex-end;">
-                    <button class="btn btn-primary" style="width:auto; background:var(--accent-orange);" onclick="window.app.processQueue()">
-                        ⚙️ Processar Fila Agora
-                    </button>
-                </div>
-            `;
-
-            if(!app.data.fluxos.length) { 
-                ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum fluxo.</div>'; 
-                return; 
-            }
-
-            const cards = app.data.fluxos.map(f => `
-                <div class="dashboard-card" style="${f.active ? 'border-color:#10b981;' : ''}">
-                    <div class="card-top">
-                        <div class="card-icon" style="background: rgba(16, 185, 129, 0.1); color:#10b981;">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn" onclick="window.app.editItem(${f.id})">✎</button>
-                            <button class="icon-btn delete" onclick="window.app.deleteCurrent(${f.id})">✕</button>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <h3>${f.nome}</h3>
-                        <p>${f.steps.length} passos • ${f.active ? '<span style="color:#10b981">Rodando</span>' : 'Parado'}</p>
-                        
-                        <div style="margin-top:15px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1);">
-                            <button class="btn btn-secondary" style="font-size:12px; padding:8px;" onclick="window.app.iniciarFluxo(${f.id})">
-                                ▶ Iniciar com Grupo
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-
-            ui.innerHTML = processButton + '<div class="grid-container">' + cards + '</div>';
-        },
-// ...
-
-// 2. Adicione estas funções NOVAS no final do objeto app (antes do showToast ou onde preferir):
-
+    // --- FUNÇÕES DE FLUXO ---
     iniciarFluxo: async (flowId) => {
         // Pede o grupo para iniciar
         const groupsOptions = app.data.grupos.map(g => `${g.id}: ${g.nome}`).join('\n');
@@ -447,4 +348,82 @@ document.addEventListener('DOMContentLoaded', app.init);
             app.showToast(`Processado! ${data.processed} e-mails enviados.`, 'success');
         } catch(e) { app.showToast('Erro ao processar fila', 'error'); }
     },
-// ...
+
+    startSending: async () => {
+        const smtpId = document.getElementById('sendSmtp').value;
+        const gid = document.getElementById('sendGrupo').value;
+        const tid = document.getElementById('sendTemplate').value;
+        const avulsos = document.getElementById('sendAvulsos').value;
+        
+        if(!smtpId) return app.showToast('Selecione um Servidor SMTP!', 'error');
+
+        let list = [];
+        if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = [...g.emails]; }
+        if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.includes('@'))];
+        list = [...new Set(list)];
+
+        if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
+        if(!confirm(`Enviar para ${list.length} pessoas?`)) return;
+
+        const tmpl = app.data.templates.find(x=>x.id==tid);
+        const subj = tmpl ? tmpl.assunto : 'Aviso';
+        const html = tmpl ? tmpl.html : 'Olá';
+
+        app.showToast(`Iniciando envio para ${list.length} contatos...`, 'success');
+        const btn = document.getElementById('btnStart');
+        btn.disabled = true; 
+        btn.innerText = "ENVIANDO...";
+        
+        let successCount = 0;
+        let errorCount = 0;
+        let lastError = "";
+
+        for(let i=0; i<list.length; i+=2) {
+            const batch = list.slice(i, i+2);
+            
+            const promises = batch.map(async (email) => {
+                try {
+                    const res = await fetch('/api/send', {
+                        method:'POST', 
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({email, subject:subj, html, smtpId})
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.error("Falha no envio:", data.error);
+                        lastError = data.error;
+                    }
+                } catch (e) {
+                    errorCount++;
+                    lastError = "Erro de conexão";
+                }
+            });
+
+            await Promise.all(promises);
+            await new Promise(r=>setTimeout(r, 1000));
+        }
+
+        btn.disabled = false; 
+        btn.innerText = "INICIAR DISPARO";
+
+        if (errorCount > 0) {
+            alert(`Envio finalizado com ERROS.\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMotivo da última falha: ${lastError}`);
+        } else {
+            app.showToast(`Envio concluído! ${successCount} enviados.`, 'success');
+        }
+    },
+
+    showToast: (msg, type) => {
+        const t = document.createElement('div');
+        t.className = `toast ${type || ''}`;
+        t.innerHTML = `<span>${msg}</span>`;
+        document.getElementById('toast-container').appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+};
+
+document.addEventListener('DOMContentLoaded', app.init);
