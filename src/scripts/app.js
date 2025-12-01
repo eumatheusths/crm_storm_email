@@ -5,7 +5,7 @@ const app = {
     data: { grupos: [], templates: [], fluxos: [], settings: [] },
     currentItemId: null,
 
-    // TRADUTOR DE ROTAS (Backend <-> Frontend)
+    // TRADUTOR DE ROTAS (Evita erro 404)
     apiMap: {
         'grupos': 'groups',
         'templates': 'templates',
@@ -14,6 +14,7 @@ const app = {
         'disparo': 'send'
     },
 
+    // --- INICIALIZAÇÃO ---
     init: async () => {
         await app.fetchData();
         const view = localStorage.getItem('lastView') || 'disparo';
@@ -27,16 +28,17 @@ const app = {
             const [g, t, f, s] = await Promise.all([
                 fetch('/api/groups').then(r => r.json()),
                 fetch('/api/templates').then(r => r.json()),
-                fetch('/api/flows').then(r => r.json()),
+                fetch('/api/flows').then(r => r.json()), // Agora traz estatísticas
                 fetch('/api/settings').then(r => r.json())
             ]);
             app.data.grupos = g || [];
             app.data.templates = t || [];
             app.data.fluxos = f || [];
             app.data.settings = s || [];
-        } catch (e) { console.error("Erro dados:", e); }
+        } catch (e) { console.error("Erro ao carregar dados:", e); }
     },
 
+    // --- NAVEGAÇÃO ---
     navigate: (view, el) => {
         app.currentView = view;
         localStorage.setItem('lastView', view);
@@ -48,8 +50,8 @@ const app = {
             'disparo': ['Disparo Rápido', 'Envie campanhas em massa'],
             'grupos': ['Grupos', 'Gerencie seus contatos'],
             'templates': ['Templates', 'Modelos de e-mail'],
-            'fluxos': ['Fluxos', 'Automação de envio'],
-            'config': ['Servidores SMTP', 'Configure seus canais de envio']
+            'fluxos': ['Fluxos', 'Automação e Estatísticas'],
+            'config': ['Servidores SMTP', 'Canais de envio']
         };
         
         if(titles[view]) {
@@ -62,14 +64,16 @@ const app = {
         app.renderList();
         app.closePanel();
         
-        if (view === 'config') app.renderForm(); // Config já abre no form direto se quiser, ou lista
+        if (view === 'config') app.renderForm(); 
     },
 
+    // --- RENDERIZAÇÃO DAS LISTAS (GRID) ---
     renderList: () => {
         const container = document.getElementById('contentArea');
         if(!container) return;
         let html = '';
 
+        // 1. TELA DE DISPARO MANUAL
         if (app.currentView === 'disparo') {
             const smtps = app.data.settings && app.data.settings.length ? app.data.settings : [];
             let smtpOptions = `<option value="">-- Selecione --</option>`;
@@ -106,8 +110,9 @@ const app = {
                 </div>
             `;
         } 
+        // 2. TELA DE CONFIGURAÇÕES (SMTP)
         else if (app.currentView === 'config') {
-            if(!app.data.settings.length) html = '<div class="empty-state">Nenhum servidor configurado. Adicione um novo no painel ao lado ou clique em "+ Adicionar Novo".</div>';
+            if(!app.data.settings.length) html = '<div class="empty-state">Nenhum servidor configurado. Adicione um novo no painel ao lado.</div>';
             else html = app.data.settings.map(s => `
                 <div class="card-item" onclick="window.app.editItem(${s.id})">
                     <div class="card-header">
@@ -123,6 +128,50 @@ const app = {
                 </div>
             `).join('');
         }
+        // 3. TELA DE FLUXOS (COM ESTATÍSTICAS)
+        else if (app.currentView === 'fluxos') {
+            // Botão global de processamento
+            const processBtn = `
+                <div style="margin-bottom:20px; display:flex; justify-content:flex-end;">
+                    <button class="btn btn-primary" style="width:auto; background:var(--accent-orange); border:none;" onclick="window.app.processQueue()">
+                        ⚙️ Processar Fila Agora
+                    </button>
+                </div>
+            `;
+
+            const list = app.data.fluxos.map(f => {
+                // Cálculo de Estatísticas
+                const sent = parseInt(f.stats?.sent || 0);
+                const opened = parseInt(f.stats?.opened || 0);
+                const openRate = sent > 0 ? Math.round((opened / sent) * 100) : 0;
+
+                return `
+                <div class="card-item" style="${f.active ? 'border-color:#10b981;' : ''}">
+                    <div class="card-header">
+                        <div class="card-meta"><div class="avatar" style="background:#22c55e">A</div><div><div class="card-title">${f.nome}</div><div class="card-preview">${f.steps ? f.steps.length : 0} passos</div></div></div>
+                        <span class="tag orange">${f.active ? 'ATIVO' : 'PARADO'}</span>
+                    </div>
+                    
+                    <div style="margin: 15px 0; background:rgba(255,255,255,0.03); padding:12px; border-radius:8px;">
+                        <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; margin-bottom:6px;">
+                            <span>Abertura: <strong>${openRate}%</strong></span>
+                            <span>${opened} de ${sent}</span>
+                        </div>
+                        <div style="height:6px; background:#333; border-radius:3px; overflow:hidden;">
+                            <div style="height:100%; width:${openRate}%; background:linear-gradient(90deg, #10b981, #34d399); transition: width 1s ease;"></div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.editItem(${f.id})">EDITAR</button>
+                        <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.iniciarFluxo(${f.id})">▶ INICIAR</button>
+                    </div>
+                </div>
+            `}).join('');
+            
+            html = processBtn + (list || '<div class="empty-state">Sem fluxos criados.</div>');
+        }
+        // 4. GRUPOS
         else if (app.currentView === 'grupos') {
             html = app.data.grupos.map(g => `
                 <div class="card-item" onclick="window.app.editItem(${g.id})">
@@ -133,6 +182,7 @@ const app = {
                 </div>
             `).join('');
         }
+        // 5. TEMPLATES
         else if (app.currentView === 'templates') {
             html = app.data.templates.map(t => `
                 <div class="card-item" onclick="window.app.editItem(${t.id})">
@@ -143,35 +193,11 @@ const app = {
                 </div>
             `).join('');
         }
-        else if (app.currentView === 'fluxos') {
-            // Adiciona botão de processamento
-            const processBtn = `
-                <div style="margin-bottom:20px; display:flex; justify-content:flex-end;">
-                    <button class="btn btn-primary" style="width:auto; background:var(--accent-orange); border:none;" onclick="window.app.processQueue()">
-                        ⚙️ Processar Fila Agora
-                    </button>
-                </div>
-            `;
-
-            const list = app.data.fluxos.map(f => `
-                <div class="card-item" style="${f.active ? 'border-color:#10b981;' : ''}">
-                    <div class="card-header">
-                        <div class="card-meta"><div class="avatar" style="background:#22c55e">A</div><div><div class="card-title">${f.nome}</div><div class="card-preview">${f.steps ? f.steps.length : 0} passos</div></div></div>
-                        <span class="tag orange">${f.active ? 'ATIVO' : 'PARADO'}</span>
-                    </div>
-                    <div style="margin-top:10px; display:flex; gap:10px;">
-                        <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.editItem(${f.id})">EDITAR</button>
-                        <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.iniciarFluxo(${f.id})">▶ INICIAR COM GRUPO</button>
-                    </div>
-                </div>
-            `).join('');
-            
-            html = processBtn + (list || '<div class="empty-state">Sem fluxos.</div>');
-        }
 
         container.innerHTML = html;
     },
 
+    // --- PAINEL LATERAL (FORMULÁRIOS) ---
     openCreatePanel: () => {
         if(app.currentView === 'disparo') return;
         app.currentItemId = null;
@@ -201,6 +227,7 @@ const app = {
         document.getElementById('dynamicForm').style.display = 'block';
         document.getElementById('actionPanel').classList.add('open');
 
+        // FORMULÁRIOS DE CADA TIPO
         if (app.currentView === 'config') {
             const item = app.currentItemId ? app.data.settings.find(x => x.id === app.currentItemId) : { name:'', smtp_host:'', smtp_port:'587', smtp_user:'', smtp_pass:'', sender_email:'', smtp_secure:false };
             title.innerText = app.currentItemId ? 'Editar SMTP' : 'Novo Servidor SMTP';
@@ -227,8 +254,6 @@ const app = {
         else if (app.currentView === 'fluxos') {
             const item = app.currentItemId ? app.data.fluxos.find(x => x.id === app.currentItemId) : { nome: '', steps: [] };
             title.innerText = 'Editor de Fluxo';
-            
-            // Passos do Fluxo
             const stepsHtml = (item.steps || []).map((s, i) => `
                 <div style="background:#151515; padding:10px; border-radius:8px; margin-bottom:8px; border:1px dashed #333;">
                     <div style="font-size:11px; color:#666; margin-bottom:4px;">PASSO ${i+1}</div>
@@ -236,16 +261,7 @@ const app = {
                     <div style="font-size:12px;">Espera: ${s.delay}h</div>
                 </div>
             `).join('');
-
-            fields = `
-                <div class="form-group"><label>Nome da Campanha</label><input id="f_nome" value="${item.nome}"></div>
-                <label>Sequência (Modo Leitura)</label>
-                ${stepsHtml || '<div style="opacity:0.5; font-size:12px;">Nenhum passo.</div>'}
-                <div style="padding:10px; background:rgba(244,137,60,0.1); border:1px solid rgba(244,137,60,0.3); border-radius:8px; font-size:12px; color:#FDBA74; margin-top:10px;">
-                    ⚠ Para editar os passos, delete este fluxo e crie um novo.
-                </div>
-                <input type="hidden" id="f_steps_json" value='${JSON.stringify(item.steps || [])}'>
-            `;
+            fields = `<div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div><label>Sequência</label>${stepsHtml}<div style="padding:10px; background:#222; border-radius:8px; font-size:12px; color:#aaa; margin-top:10px;">Para editar passos, delete este fluxo e crie um novo.</div><input type="hidden" id="f_steps_json" value='${JSON.stringify(item.steps || [])}'>`;
         }
 
         if(app.currentItemId) {
@@ -254,6 +270,7 @@ const app = {
         container.innerHTML = fields;
     },
 
+    // --- AÇÕES CRUD ---
     saveCurrent: async () => {
         const id = app.currentItemId;
         const method = id ? 'PUT' : 'POST';
@@ -313,27 +330,39 @@ const app = {
         } catch(e) { app.showToast('Erro ao excluir.', 'error'); }
     },
 
-    // --- FUNÇÕES DE FLUXO ---
+    // --- FUNÇÕES DE FLUXO (INICIAR/PROCESSAR) ---
+    
     iniciarFluxo: async (flowId) => {
-        // Pede o grupo para iniciar
-        const groupsOptions = app.data.grupos.map(g => `${g.id}: ${g.nome}`).join('\n');
-        const groupId = prompt(`Digite o ID do grupo para iniciar este fluxo:\n\n${groupsOptions}`);
+        // Prompt inteligente: Aceita ID ou E-mail
+        const choice = prompt(
+            "🚀 INICIAR AUTOMAÇÃO\n\n" +
+            "• Para enviar para um GRUPO: Digite o ID do grupo (ex: 1, 2)\n" +
+            "• Para enviar para UM E-MAIL: Digite o e-mail (ex: cliente@teste.com)\n\n" +
+            "Digite abaixo:"
+        );
         
-        if(!groupId) return;
+        if(!choice) return;
 
-        app.showToast('Iniciando...', 'info');
+        app.showToast('Adicionando à fila...', 'info');
+        
+        const isEmail = choice.includes('@');
         
         try {
             const res = await fetch('/api/flows/start', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ flowId, groupId })
+                body: JSON.stringify({ 
+                    flowId, 
+                    groupId: isEmail ? null : choice, 
+                    singleEmail: isEmail ? choice : null 
+                })
             });
             const data = await res.json();
             
             if(res.ok) {
-                app.showToast(`${data.added} contatos adicionados à fila!`, 'success');
-                app.fetchData().then(() => app.renderList());
+                app.showToast(`Sucesso! ${data.added} contatos na fila.`, 'success');
+                // Recarrega para atualizar stats
+                setTimeout(() => app.fetchData().then(() => app.renderList()), 2000);
             } else {
                 app.showToast('Erro: ' + data.error, 'error');
             }
@@ -346,9 +375,12 @@ const app = {
             const res = await fetch('/api/flows/process');
             const data = await res.json();
             app.showToast(`Processado! ${data.processed} e-mails enviados.`, 'success');
+            // Atualiza estatísticas
+            app.fetchData().then(() => app.renderList());
         } catch(e) { app.showToast('Erro ao processar fila', 'error'); }
     },
 
+    // --- DISPARO MANUAL ---
     startSending: async () => {
         const smtpId = document.getElementById('sendSmtp').value;
         const gid = document.getElementById('sendGrupo').value;
@@ -378,11 +410,13 @@ const app = {
         let errorCount = 0;
         let lastError = "";
 
+        // Envia em lotes de 2
         for(let i=0; i<list.length; i+=2) {
             const batch = list.slice(i, i+2);
             
             const promises = batch.map(async (email) => {
                 try {
+                    // Adiciona tracking pixel também no manual se quiser (opcional)
                     const res = await fetch('/api/send', {
                         method:'POST', 
                         headers:{'Content-Type':'application/json'},
@@ -426,4 +460,5 @@ const app = {
     }
 };
 
+// Iniciar
 document.addEventListener('DOMContentLoaded', app.init);
