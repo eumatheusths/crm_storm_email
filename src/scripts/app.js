@@ -5,19 +5,18 @@ const app = {
     data: { grupos: [], templates: [], fluxos: [], settings: [] },
     currentItemId: null,
 
-    // --- TRADUTOR DE ROTAS (CORREÇÃO DO ERRO 404) ---
-    // Mapeia o nome da tela (Visual) para o nome do arquivo da API (Código)
+    // MAPA DE API (IMPORTANTE PARA EVITAR ERRO 404)
     apiMap: {
-        'grupos': 'groups',       // Tela 'grupos' -> arquivo 'groups.ts'
-        'templates': 'templates', // Tela 'templates' -> arquivo 'templates.ts'
-        'fluxos': 'flows',        // Tela 'fluxos' -> arquivo 'flows.ts'
-        'config': 'settings'      // Tela 'config' -> arquivo 'settings.ts'
+        'grupos': 'groups',
+        'templates': 'templates',
+        'fluxos': 'flows',
+        'config': 'settings',
+        'disparo': 'send'
     },
 
     init: async () => {
         await app.fetchData();
         const view = localStorage.getItem('lastView') || 'disparo';
-        // Garante que o elemento existe antes de navegar
         const navItem = document.querySelector(`.nav-item[data-target="${view}"]`) || document.querySelector('.nav-item[data-target="disparo"]');
         app.navigate(view, navItem);
         window.app = app; 
@@ -25,7 +24,6 @@ const app = {
 
     fetchData: async () => {
         try {
-            // Aqui usamos os nomes em inglês direto, pois são fixos
             const [g, t, f, s] = await Promise.all([
                 fetch('/api/groups').then(r => r.json()),
                 fetch('/api/templates').then(r => r.json()),
@@ -73,15 +71,21 @@ const app = {
         let html = '';
 
         if (app.currentView === 'disparo') {
-            const smtps = app.data.settings && app.data.settings.length ? app.data.settings : [{id:'', name:'⚠️ Configure um SMTP primeiro'}];
+            const smtps = app.data.settings && app.data.settings.length ? app.data.settings : [];
             
+            // Se não tiver SMTP, avisa
+            let smtpOptions = `<option value="">-- Selecione --</option>`;
+            if (smtps.length === 0) {
+                smtpOptions = `<option value="">⚠️ Configure um SMTP na aba Configurações</option>`;
+            } else {
+                smtpOptions += smtps.map(s => `<option value="${s.id}">${s.name} (${s.smtp_user})</option>`).join('');
+            }
+
             html = `
                 <div class="card-item" style="cursor:default;">
                     <div class="form-group" style="border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:20px; margin-bottom:20px;">
                         <label style="color:#a78bfa;">🚀 Servidor de Envio (SMTP)</label>
-                        <select id="sendSmtp" style="border-color:#7c3aed;">
-                            ${smtps.map(s => `<option value="${s.id}">${s.name} ${s.smtp_user ? '('+s.smtp_user+')' : ''}</option>`).join('')}
-                        </select>
+                        <select id="sendSmtp" style="border-color:#7c3aed;">${smtpOptions}</select>
                     </div>
 
                     <div class="form-group">
@@ -99,7 +103,7 @@ const app = {
                         <label>Template</label>
                         <select id="sendTemplate">${app.data.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}</select>
                     </div>
-                    <button class="btn btn-primary" onclick="window.app.startSending()">INICIAR DISPARO</button>
+                    <button class="btn btn-primary" id="btnStart" onclick="window.app.startSending()">INICIAR DISPARO</button>
                 </div>
             `;
         } 
@@ -109,20 +113,19 @@ const app = {
                 <div class="card-item" onclick="window.app.editItem(${s.id})">
                     <div class="card-header">
                         <div class="card-meta">
-                            <div class="avatar" style="background:#0ea5e9"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></div>
+                            <div class="avatar" style="background:#0ea5e9">S</div>
                             <div>
                                 <div class="card-title">${s.name}</div>
-                                <div class="card-preview">${s.smtp_host} • ${s.sender_email || s.smtp_user}</div>
+                                <div class="card-preview">${s.smtp_host} • ${s.smtp_user}</div>
                             </div>
                         </div>
-                        <span class="tag" style="border:1px solid #333; color:#aaa;">${s.smtp_port}</span>
+                        <span class="tag" style="border:1px solid #333; color:#aaa;">Porta ${s.smtp_port}</span>
                     </div>
                 </div>
             `).join('');
         }
         else if (app.currentView === 'grupos') {
-            if(!app.data.grupos.length) html = '<div class="empty-state">Sem grupos.</div>';
-            else html = app.data.grupos.map(g => `
+            html = app.data.grupos.map(g => `
                 <div class="card-item" onclick="window.app.editItem(${g.id})">
                     <div class="card-header">
                         <div class="card-meta"><div class="avatar purple-gradient">G</div><div><div class="card-title">${g.nome}</div><div class="card-preview">${g.emails ? g.emails.length : 0} contatos</div></div></div>
@@ -132,8 +135,7 @@ const app = {
             `).join('');
         }
         else if (app.currentView === 'templates') {
-            if(!app.data.templates.length) html = '<div class="empty-state">Sem templates.</div>';
-            else html = app.data.templates.map(t => `
+            html = app.data.templates.map(t => `
                 <div class="card-item" onclick="window.app.editItem(${t.id})">
                     <div class="card-header">
                         <div class="card-meta"><div class="avatar" style="background:#333">T</div><div><div class="card-title">${t.nome}</div><div class="card-preview">${t.assunto}</div></div></div>
@@ -143,8 +145,7 @@ const app = {
             `).join('');
         }
         else if (app.currentView === 'fluxos') {
-            if(!app.data.fluxos.length) html = '<div class="empty-state">Sem fluxos.</div>';
-            else html = app.data.fluxos.map(f => `
+            html = app.data.fluxos.map(f => `
                 <div class="card-item" onclick="window.app.editItem(${f.id})">
                     <div class="card-header">
                         <div class="card-meta"><div class="avatar" style="background:#22c55e">A</div><div><div class="card-title">${f.nome}</div><div class="card-preview">${f.steps ? f.steps.length : 0} passos</div></div></div>
@@ -191,11 +192,11 @@ const app = {
             title.innerText = app.currentItemId ? 'Editar SMTP' : 'Novo Servidor SMTP';
             fields = `
                 <div class="form-group"><label>Nome do Perfil</label><input id="c_name" value="${item.name || ''}" placeholder="Nicopel Marketing"></div>
-                <div class="form-group"><label>Host</label><input id="c_host" value="${item.smtp_host || ''}" placeholder="smtp.titan.email"></div>
+                <div class="form-group"><label>Host (Servidor)</label><input id="c_host" value="${item.smtp_host || ''}" placeholder="smtp.titan.email"></div>
                 <div class="form-group"><label>Porta</label><input type="number" id="c_port" value="${item.smtp_port || 587}"></div>
                 <div class="form-group"><label>Usuário</label><input id="c_user" value="${item.smtp_user || ''}"></div>
-                <div class="form-group"><label>Senha</label><input type="password" id="c_pass" value="${item.smtp_pass || ''}"></div>
-                <div class="form-group"><label>Remetente</label><input id="c_sender" value="${item.sender_email || ''}"></div>
+                <div class="form-group"><label>Senha</label><input type="text" id="c_pass" value="${item.smtp_pass || ''}"></div>
+                <div class="form-group"><label>Remetente (Opcional)</label><input id="c_sender" value="${item.sender_email || ''}"></div>
                 <div class="form-group"><label>Segurança</label><select id="c_secure"><option value="false" ${!item.smtp_secure?'selected':''}>Não (587)</option><option value="true" ${item.smtp_secure?'selected':''}>Sim (465)</option></select></div>
             `;
         }
@@ -226,7 +227,6 @@ const app = {
         const method = id ? 'PUT' : 'POST';
         let body = {};
 
-        // Coleta dados
         if (app.currentView === 'config') {
             body = {
                 id: id,
@@ -249,45 +249,36 @@ const app = {
             body = { id, nome: document.getElementById('f_nome').value, steps: JSON.parse(document.getElementById('f_steps_json').value) };
         }
 
-        // --- CORREÇÃO DO ENDPOINT ---
-        // Usa o mapa para converter 'grupos' -> 'groups', 'fluxos' -> 'flows', etc.
-        const endpointName = app.apiMap[app.currentView]; 
-        
-        if (!endpointName) {
-            app.showToast(`Erro interno: Rota ${app.currentView} não mapeada.`, 'error');
-            return;
-        }
+        const endpoint = app.apiMap[app.currentView];
 
         try {
-            const res = await fetch(`/api/${endpointName}`, {
+            const res = await fetch(`/api/${endpoint}`, {
                 method: method,
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(body)
             });
-            
             if(res.ok) {
                 app.showToast('Salvo com sucesso!', 'success');
                 app.fetchData().then(() => app.renderList());
                 app.closePanel();
             } else {
-                app.showToast('Erro ao salvar.', 'error');
+                app.showToast('Erro ao salvar no servidor.', 'error');
             }
-        } catch (e) { app.showToast('Erro de conexão.', 'error'); }
+        } catch(e) { app.showToast('Erro de conexão.', 'error'); }
     },
 
     deleteCurrent: async () => {
         if(!confirm("Tem certeza?")) return;
-        
-        // --- CORREÇÃO DO ENDPOINT NA DELEÇÃO TAMBÉM ---
-        const endpointName = app.apiMap[app.currentView];
-
-        await fetch(`/api/${endpointName}`, {
-            method: 'DELETE',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ id: app.currentItemId })
-        });
-        app.showToast('Item excluído.', 'success');
-        app.fetchData().then(() => { app.renderList(); app.closePanel(); });
+        const endpoint = app.apiMap[app.currentView];
+        try {
+            await fetch(`/api/${endpoint}`, {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: app.currentItemId })
+            });
+            app.showToast('Item excluído.', 'success');
+            app.fetchData().then(() => { app.renderList(); app.closePanel(); });
+        } catch(e) { app.showToast('Erro ao excluir.', 'error'); }
     },
 
     startSending: async () => {
@@ -310,19 +301,54 @@ const app = {
         const subj = tmpl ? tmpl.assunto : 'Aviso';
         const html = tmpl ? tmpl.html : 'Olá';
 
-        app.showToast('Iniciando envio...', 'success');
+        app.showToast(`Iniciando envio para ${list.length} contatos...`, 'success');
+        const btn = document.getElementById('btnStart');
+        btn.disabled = true; 
+        btn.innerText = "ENVIANDO...";
         
-        for(let i=0; i<list.length; i+=5) {
-            const batch = list.slice(i, i+5);
-            await Promise.all(batch.map(email => 
-                fetch('/api/send', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({email, subject:subj, html, smtpId})
-                })
-            ));
+        let successCount = 0;
+        let errorCount = 0;
+        let lastError = "";
+
+        // Envia em lotes de 2 para não sobrecarregar
+        for(let i=0; i<list.length; i+=2) {
+            const batch = list.slice(i, i+2);
+            
+            const promises = batch.map(async (email) => {
+                try {
+                    const res = await fetch('/api/send', {
+                        method:'POST', 
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({email, subject:subj, html, smtpId})
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.error("Falha no envio:", data.error);
+                        lastError = data.error; // Guarda o erro pra mostrar pro usuário
+                    }
+                } catch (e) {
+                    errorCount++;
+                    lastError = "Erro de conexão";
+                }
+            });
+
+            await Promise.all(promises);
+            // Delay para evitar bloqueio do servidor SMTP (1 segundo)
             await new Promise(r=>setTimeout(r, 1000));
         }
-        app.showToast('Envio concluído!', 'success');
+
+        btn.disabled = false; 
+        btn.innerText = "INICIAR DISPARO";
+
+        if (errorCount > 0) {
+            alert(`Envio finalizado com ERROS.\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMotivo da última falha: ${lastError}`);
+        } else {
+            app.showToast(`Envio concluído! ${successCount} enviados.`, 'success');
+        }
     },
 
     showToast: (msg, type) => {
