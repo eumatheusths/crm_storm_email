@@ -4,10 +4,9 @@ import nodemailer from "nodemailer";
 
 export const GET: APIRoute = async ({ request }) => {
   try {
-    // URL base do site para o pixel funcionar
     const siteUrl = new URL(request.url).origin; 
 
-    // 1. Configurar SMTP
+    // 1. SMTP
     const settingsRes = await pool.query("SELECT * FROM settings LIMIT 1");
     const config = settingsRes.rows[0];
     if (!config) return new Response("Sem SMTP", { status: 500 });
@@ -19,7 +18,7 @@ export const GET: APIRoute = async ({ request }) => {
         tls: { rejectUnauthorized: false }
     });
 
-    // 2. Buscar tarefas
+    // 2. Tarefas
     const tasks = await pool.query(`
         SELECT t.*, f.steps 
         FROM flow_tracking t
@@ -44,51 +43,36 @@ export const GET: APIRoute = async ({ request }) => {
             
             if (templateRes.rows.length > 0) {
                 const tmpl = templateRes.rows[0];
-                
-                // A. Cria Log de Envio
                 const logRes = await pool.query(
                     "INSERT INTO email_logs (flow_id, step_index, email, template_id) VALUES ($1, $2, $3, $4) RETURNING id",
                     [task.flow_id, task.current_step_index, task.email, tmpl.id]
                 );
                 const logId = logRes.rows[0].id;
-
-                // B. Injeta Pixel de Rastreamento
-                const trackingPixel = `<img src="${siteUrl}/api/track?id=${logId}" width="1" height="1" style="display:none;" alt="" />`;
-                const finalHtml = tmpl.html + trackingPixel;
-
-                // C. Envia
+                const trackingPixel = `<img src="${siteUrl}/api/track?id=${logId}" width="1" height="1" style="display:none;" />`;
+                
                 await transporter.sendMail({
                     from: `"Nicopel Auto" <${config.sender_email || config.smtp_user}>`,
-                    to: task.email,
-                    subject: tmpl.assunto,
-                    html: finalHtml
+                    to: task.email, subject: tmpl.assunto, html: tmpl.html + trackingPixel
                 });
             }
 
-            // D. Agendar Próximo
+            // 3. Agendar Próximo (COM LÓGICA DE UNIDADES)
             const nextIndex = task.current_step_index + 1;
             const nextStepData = steps[nextIndex];
 
             if (nextStepData) {
-                const delayHours = parseInt(nextStepData.delay) || 0;
+                const delay = parseInt(nextStepData.delay) || 0;
+                // Padrão 'hours' se não tiver unit
+                const unit = nextStepData.unit || 'hours'; 
+                
+                // Validação de segurança para SQL Injection
+                const validUnits = ['minutes', 'hours', 'days'];
+                const safeUnit = validUnits.includes(unit) ? unit : 'hours';
+
                 await pool.query(`
                     UPDATE flow_tracking 
-                    SET current_step_index = $1, next_execution_at = NOW() + interval '${delayHours} hours' 
+                    SET current_step_index = $1, next_execution_at = NOW() + interval '${delay} ${safeUnit}' 
                     WHERE id = $2
                 `, [nextIndex, task.id]);
             } else {
-                await pool.query("UPDATE flow_tracking SET status = 'completed' WHERE id = $1", [task.id]);
-            }
-            
-            processed++;
-
-        } catch (err) {
-            console.error("Erro envio auto:", err);
-        }
-    }
-
-    return new Response(JSON.stringify({ processed }));
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
-  }
-};
+                await pool.query
