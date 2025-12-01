@@ -361,3 +361,90 @@ const app = {
 };
 
 document.addEventListener('DOMContentLoaded', app.init);
+
+// ATUALIZAÇÃO PARCIAL DO src/scripts/app.js
+
+// 1. Atualize a função renderFluxos dentro do objeto app:
+// ...
+        renderFluxos: () => {
+            const ui = document.getElementById('listaFluxosUI');
+            
+            // Botão global de processamento (O motor do sistema)
+            const processButton = `
+                <div style="margin-bottom:20px; display:flex; justify-content:flex-end;">
+                    <button class="btn btn-primary" style="width:auto; background:var(--accent-orange);" onclick="window.app.processQueue()">
+                        ⚙️ Processar Fila Agora
+                    </button>
+                </div>
+            `;
+
+            if(!app.data.fluxos.length) { 
+                ui.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#555;">Nenhum fluxo.</div>'; 
+                return; 
+            }
+
+            const cards = app.data.fluxos.map(f => `
+                <div class="dashboard-card" style="${f.active ? 'border-color:#10b981;' : ''}">
+                    <div class="card-top">
+                        <div class="card-icon" style="background: rgba(16, 185, 129, 0.1); color:#10b981;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn" onclick="window.app.editItem(${f.id})">✎</button>
+                            <button class="icon-btn delete" onclick="window.app.deleteCurrent(${f.id})">✕</button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <h3>${f.nome}</h3>
+                        <p>${f.steps.length} passos • ${f.active ? '<span style="color:#10b981">Rodando</span>' : 'Parado'}</p>
+                        
+                        <div style="margin-top:15px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1);">
+                            <button class="btn btn-secondary" style="font-size:12px; padding:8px;" onclick="window.app.iniciarFluxo(${f.id})">
+                                ▶ Iniciar com Grupo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            ui.innerHTML = processButton + '<div class="grid-container">' + cards + '</div>';
+        },
+// ...
+
+// 2. Adicione estas funções NOVAS no final do objeto app (antes do showToast ou onde preferir):
+
+    iniciarFluxo: async (flowId) => {
+        // Pede o grupo para iniciar
+        const groupsOptions = app.data.grupos.map(g => `${g.id}: ${g.nome}`).join('\n');
+        const groupId = prompt(`Digite o ID do grupo para iniciar este fluxo:\n\n${groupsOptions}`);
+        
+        if(!groupId) return;
+
+        app.showToast('Iniciando...', 'info');
+        
+        try {
+            const res = await fetch('/api/flows/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ flowId, groupId })
+            });
+            const data = await res.json();
+            
+            if(res.ok) {
+                app.showToast(`${data.added} contatos adicionados à fila!`, 'success');
+                app.fetchData().then(() => app.renderList());
+            } else {
+                app.showToast('Erro: ' + data.error, 'error');
+            }
+        } catch(e) { app.showToast('Erro de conexão', 'error'); }
+    },
+
+    processQueue: async () => {
+        app.showToast('Processando envios pendentes...', 'info');
+        try {
+            const res = await fetch('/api/flows/process');
+            const data = await res.json();
+            app.showToast(`Processado! ${data.processed} e-mails enviados.`, 'success');
+        } catch(e) { app.showToast('Erro ao processar fila', 'error'); }
+    },
+// ...
