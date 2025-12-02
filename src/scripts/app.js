@@ -332,38 +332,79 @@ const app = {
         } catch(e) { app.showToast('Erro processamento', 'error'); }
     },
 
+   // ... resto do código ...
+
     startSending: async () => {
         const smtpId = document.getElementById('sendSmtp').value;
         const gid = document.getElementById('sendGrupo').value;
         const tid = document.getElementById('sendTemplate').value;
         const avulsos = document.getElementById('sendAvulsos').value;
-        if(!smtpId) return app.showToast('Selecione SMTP!', 'error');
-        let list = []; if(gid){const g=app.data.grupos.find(x=>x.id==gid); if(g) list=[...g.emails];} if(avulsos) list=[...list, ...avulsos.split('\n').filter(e=>e.includes('@'))]; list=[...new Set(list)];
-        if(!list.length) return app.showToast('Sem e-mails', 'error');
-        if(!confirm(`Enviar para ${list.length}?`)) return;
-        const tmpl = app.data.templates.find(x=>x.id==tid);
-        const subj = tmpl ? tmpl.assunto : 'Aviso'; const html = tmpl ? tmpl.html : 'Olá';
         
-        app.showToast('Enviando...', 'success');
-        const btn = document.getElementById('btnStart'); btn.disabled=true; btn.innerText = "ENVIANDO...";
-        let sc=0, ec=0;
+        if(!smtpId) return app.showToast('Selecione um Servidor SMTP!', 'error');
+
+        let list = [];
+        if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = [...g.emails]; }
+        if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.includes('@'))];
+        list = [...new Set(list)];
+
+        if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
+        if(!confirm(`Enviar para ${list.length} pessoas?`)) return;
+
+        const tmpl = app.data.templates.find(x=>x.id==tid);
+        const subj = tmpl ? tmpl.assunto : 'Aviso';
+        const html = tmpl ? tmpl.html : 'Olá';
+
+        app.showToast(`Iniciando envio para ${list.length} contatos...`, 'success');
+        const btn = document.getElementById('btnStart');
+        btn.disabled = true; 
+        btn.innerText = "ENVIANDO...";
+        
+        let successCount = 0;
+        let errorCount = 0;
+        let lastError = ""; // Variável para guardar o motivo do erro
+
+        // Envia em lotes de 2
         for(let i=0; i<list.length; i+=2) {
-            await Promise.all(list.slice(i,i+2).map(async (email) => {
+            const batch = list.slice(i, i+2);
+            
+            const promises = batch.map(async (email) => {
                 try {
-                    const res = await fetch('/api/send', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email, subject:subj, html, smtpId})});
-                    if(res.ok) sc++; else ec++;
-                } catch(e) { ec++; }
-            }));
-            await new Promise(r=>setTimeout(r,1000));
+                    const res = await fetch('/api/send', {
+                        method:'POST', 
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({email, subject:subj, html, smtpId})
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.error("Falha no envio:", data.error);
+                        lastError = data.error; // Guarda o erro pra mostrar pro usuário
+                    }
+                } catch (e) {
+                    errorCount++;
+                    lastError = "Erro de conexão com o servidor";
+                }
+            });
+
+            await Promise.all(promises);
+            await new Promise(r=>setTimeout(r, 1000));
         }
-        btn.disabled=false; btn.innerText="INICIAR DISPARO";
-        app.showToast(`Fim: ${sc} ok, ${ec} erros.`, 'success');
+
+        btn.disabled = false; 
+        btn.innerText = "INICIAR DISPARO";
+
+        // MOSTRA O ERRO NA TELA
+        if (errorCount > 0) {
+            alert(`Envio finalizado com ERROS.\n\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMOTIVO DA FALHA:\n${lastError}`);
+        } else {
+            app.showToast(`Envio concluído! ${successCount} enviados.`, 'success');
+        }
     },
 
-    showToast: (msg, type) => {
-        const t = document.createElement('div'); t.className = `toast ${type||''}`; t.innerHTML = `<span>${msg}</span>`;
-        document.getElementById('toast-container').appendChild(t); setTimeout(() => t.remove(), 3000);
-    }
+    // ... resto do código ...
 };
 
 document.addEventListener('DOMContentLoaded', app.init);
