@@ -4,8 +4,9 @@ const app = {
     currentView: 'disparo',
     data: { grupos: [], templates: [], fluxos: [], settings: [] },
     currentItemId: null,
-    tempSteps: [],
+    tempSteps: [], // Variável temporária para edição de fluxos
 
+    // TRADUTOR DE ROTAS (Backend <-> Frontend)
     apiMap: {
         'grupos': 'groups',
         'templates': 'templates',
@@ -14,6 +15,7 @@ const app = {
         'disparo': 'send'
     },
 
+    // --- INICIALIZAÇÃO ---
     init: async () => {
         await app.fetchData();
         const view = localStorage.getItem('lastView') || 'disparo';
@@ -27,138 +29,245 @@ const app = {
             const [g, t, f, s] = await Promise.all([
                 fetch('/api/groups').then(r => r.json()),
                 fetch('/api/templates').then(r => r.json()),
-                fetch('/api/flows').then(r => r.json()),
+                fetch('/api/flows').then(r => r.json()), 
                 fetch('/api/settings').then(r => r.json())
             ]);
             app.data.grupos = g || [];
             app.data.templates = t || [];
             app.data.fluxos = f || [];
             app.data.settings = s || [];
-        } catch (e) { console.error("Erro dados:", e); }
+        } catch (e) { console.error("Erro ao carregar dados:", e); }
     },
 
+    // --- NAVEGAÇÃO ---
     navigate: (view, el) => {
         app.currentView = view;
         localStorage.setItem('lastView', view);
+        
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         if(el) el.classList.add('active');
-        
+
         const titles = {
             'disparo': ['Disparo Rápido', 'Envie campanhas em massa'],
-            'grupos': ['Grupos', 'Importe e gerencie contatos'],
+            'grupos': ['Grupos', 'Gerencie seus contatos'],
             'templates': ['Templates', 'Modelos de e-mail'],
-            'fluxos': ['Fluxos', 'Automação de envio'],
-            'config': ['Servidores SMTP', 'Configure seus canais de envio']
+            'fluxos': ['Fluxos', 'Automação e Estatísticas'],
+            'config': ['Servidores SMTP', 'Canais de envio']
         };
+        
         if(titles[view]) {
-            document.getElementById('pageTitle').innerText = titles[view][0];
-            document.getElementById('pageSubtitle').innerText = titles[view][1];
+            const titleEl = document.getElementById('pageTitle');
+            const subEl = document.getElementById('pageSubtitle');
+            if(titleEl) titleEl.innerText = titles[view][0];
+            if(subEl) subEl.innerText = titles[view][1];
         }
+
         app.renderList();
         app.closePanel();
+        
         if (view === 'config') app.renderForm(); 
     },
 
+    // --- RENDERIZAÇÃO DAS LISTAS (GRID) ---
     renderList: () => {
         const container = document.getElementById('contentArea');
         if(!container) return;
         let html = '';
 
+        // 1. TELA DE DISPARO MANUAL
         if (app.currentView === 'disparo') {
-            const smtps = app.data.settings.length ? app.data.settings : [];
-            let smtpOptions = smtps.length ? smtps.map(s => `<option value="${s.id}">${s.name} (${s.smtp_user})</option>`).join('') : `<option value="">⚠️ Configure um SMTP</option>`;
+            const smtps = app.data.settings && app.data.settings.length ? app.data.settings : [];
+            let smtpOptions = `<option value="">-- Selecione --</option>`;
+            
+            if (smtps.length === 0) {
+                smtpOptions = `<option value="">⚠️ Configure um SMTP na aba Configurações</option>`;
+            } else {
+                smtpOptions += smtps.map(s => `<option value="${s.id}">${s.name} (${s.smtp_user})</option>`).join('');
+            }
+
             html = `
                 <div class="card-item" style="cursor:default;">
                     <div class="form-group" style="border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:20px; margin-bottom:20px;">
-                        <label style="color:#a78bfa;">🚀 Servidor de Envio</label>
+                        <label style="color:#a78bfa;">🚀 Servidor de Envio (SMTP)</label>
                         <select id="sendSmtp" style="border-color:#7c3aed;">${smtpOptions}</select>
                     </div>
-                    <div class="form-group"><label>Grupo de Destino</label><select id="sendGrupo"><option value="">-- Selecione --</option>${app.data.grupos.map(g=>`<option value="${g.id}">${g.nome}</option>`).join('')}</select></div>
-                    <div class="form-group"><label>Ou e-mails avulsos</label><textarea id="sendAvulsos" rows="3" placeholder="email@exemplo.com"></textarea></div>
-                    <div class="form-group"><label>Template</label><select id="sendTemplate">${app.data.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}</select></div>
+
+                    <div class="form-group">
+                        <label>Grupo de Destino</label>
+                        <select id="sendGrupo">
+                            <option value="">-- Selecione --</option>
+                            ${app.data.grupos.map(g=>`<option value="${g.id}">${g.nome}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ou e-mails avulsos</label>
+                        <textarea id="sendAvulsos" rows="3" placeholder="email@exemplo.com"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Template</label>
+                        <select id="sendTemplate">${app.data.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}</select>
+                    </div>
                     <button class="btn btn-primary" id="btnStart" onclick="window.app.startSending()">INICIAR DISPARO</button>
                 </div>
             `;
         } 
+        // 2. TELA DE CONFIGURAÇÕES (SMTP)
+        else if (app.currentView === 'config') {
+            if(!app.data.settings.length) html = '<div class="empty-state">Nenhum servidor configurado. Adicione um novo no painel ao lado.</div>';
+            else html = app.data.settings.map(s => `
+                <div class="card-item" onclick="window.app.editItem(${s.id})">
+                    <div class="card-header">
+                        <div class="card-meta">
+                            <div class="avatar" style="background:#0ea5e9">S</div>
+                            <div>
+                                <div class="card-title">${s.name}</div>
+                                <div class="card-preview">${s.smtp_host} • ${s.smtp_user}</div>
+                            </div>
+                        </div>
+                        <span class="tag" style="border:1px solid #333; color:#aaa;">Porta ${s.smtp_port}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        // 3. TELA DE FLUXOS (COM ESTATÍSTICAS)
         else if (app.currentView === 'fluxos') {
-            const processBtn = `<div style="margin-bottom:20px; display:flex; justify-content:flex-end;"><button class="btn btn-primary" style="width:auto; background:var(--accent-orange); border:none;" onclick="window.app.processQueue()">⚙️ Processar Fila Agora</button></div>`;
+            const processBtn = `
+                <div style="margin-bottom:20px; display:flex; justify-content:flex-end;">
+                    <button class="btn btn-primary" style="width:auto; background:var(--accent-orange); border:none;" onclick="window.app.processQueue()">
+                        ⚙️ Processar Fila Agora
+                    </button>
+                </div>
+            `;
+
             const list = app.data.fluxos.map(f => {
                 const sent = parseInt(f.stats?.sent || 0);
                 const opened = parseInt(f.stats?.opened || 0);
                 const openRate = sent > 0 ? Math.round((opened / sent) * 100) : 0;
+
                 return `
-                <div class="card-item" style="${f.active ? 'border-left: 4px solid #10b981;' : ''}">
+                <div class="card-item" style="${f.active ? 'border-color:#10b981;' : ''}">
                     <div class="card-header">
-                        <div class="card-meta"><div class="avatar" style="background:#22c55e">A</div><div><div class="card-title">${f.nome}</div><div class="card-preview">${f.steps.length} passos</div></div></div>
+                        <div class="card-meta"><div class="avatar" style="background:#22c55e">A</div><div><div class="card-title">${f.nome}</div><div class="card-preview">${f.steps ? f.steps.length : 0} passos</div></div></div>
                         <span class="tag orange">${f.active ? 'ATIVO' : 'PARADO'}</span>
                     </div>
-                    <div style="margin:15px 0; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px;">
-                        <div style="font-size:11px; color:#aaa; display:flex; justify-content:space-between; margin-bottom:5px;"><span>Taxa de Abertura: ${openRate}%</span><span>${opened}/${sent}</span></div>
-                        <div style="height:4px; background:#333; border-radius:2px; overflow:hidden;"><div style="height:100%; width:${openRate}%; background:#10b981;"></div></div>
+                    
+                    <div style="margin: 15px 0; background:rgba(255,255,255,0.03); padding:12px; border-radius:8px;">
+                        <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; margin-bottom:6px;">
+                            <span>Abertura: <strong>${openRate}%</strong></span>
+                            <span>${opened} de ${sent}</span>
+                        </div>
+                        <div style="height:6px; background:#333; border-radius:3px; overflow:hidden;">
+                            <div style="height:100%; width:${openRate}%; background:linear-gradient(90deg, #10b981, #34d399); transition: width 1s ease;"></div>
+                        </div>
                     </div>
+
                     <div style="display:flex; gap:10px;">
                         <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.editItem(${f.id})">EDITAR</button>
-                        <button class="btn btn-secondary" style="font-size:11px; padding:8px; border-color:#7c3aed; color:#a78bfa;" onclick="window.app.iniciarFluxo(${f.id})">▶ INICIAR</button>
+                        <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.iniciarFluxo(${f.id})">▶ INICIAR</button>
                         <button class="btn btn-secondary" style="font-size:11px; padding:8px; border-color:#ef4444; color:#ef4444;" onclick="window.app.deleteCurrent(${f.id})">🗑</button>
                     </div>
-                </div>`
-            }).join('');
-            html = processBtn + (list || '<div class="empty-state">Sem fluxos.</div>');
+                </div>
+            `}).join('');
+            
+            html = processBtn + (list || '<div class="empty-state">Sem fluxos criados.</div>');
         }
+        // 4. GRUPOS
         else if (app.currentView === 'grupos') {
-            html = app.data.grupos.map(g => `<div class="card-item" onclick="window.app.editItem(${g.id})"><div class="card-header"><div class="card-meta"><div class="avatar purple-gradient">G</div><div><div class="card-title">${g.nome}</div><div class="card-preview">${g.emails ? g.emails.length : 0} contatos</div></div></div><span class="tag orange">Lista</span></div></div>`).join('');
+            html = app.data.grupos.map(g => `
+                <div class="card-item" onclick="window.app.editItem(${g.id})">
+                    <div class="card-header">
+                        <div class="card-meta"><div class="avatar purple-gradient">G</div><div><div class="card-title">${g.nome}</div><div class="card-preview">${g.emails ? g.emails.length : 0} contatos</div></div></div>
+                        <span class="tag orange">Lista</span>
+                    </div>
+                </div>
+            `).join('');
         }
+        // 5. TEMPLATES
         else if (app.currentView === 'templates') {
-            html = app.data.templates.map(t => `<div class="card-item" onclick="window.app.editItem(${t.id})"><div class="card-header"><div class="card-meta"><div class="avatar" style="background:#333">T</div><div><div class="card-title">${t.nome}</div><div class="card-preview">${t.assunto}</div></div></div><span class="tag purple">HTML</span></div></div>`).join('');
+            html = app.data.templates.map(t => `
+                <div class="card-item" onclick="window.app.editItem(${t.id})">
+                    <div class="card-header">
+                        <div class="card-meta"><div class="avatar" style="background:#333">T</div><div><div class="card-title">${t.nome}</div><div class="card-preview">${t.assunto}</div></div></div>
+                        <span class="tag purple">HTML</span>
+                    </div>
+                </div>
+            `).join('');
         }
-        else if (app.currentView === 'config') {
-            html = app.data.settings.map(s => `<div class="card-item" onclick="window.app.editItem(${s.id})"><div class="card-header"><div class="card-meta"><div class="avatar" style="background:#0ea5e9">S</div><div><div class="card-title">${s.name}</div><div class="card-preview">${s.smtp_host}</div></div></div></div></div>`).join('');
-        }
+
         container.innerHTML = html;
     },
 
-    openCreatePanel: () => { if(app.currentView === 'disparo') return; app.currentItemId = null; app.renderForm(); },
-    editItem: (id) => { app.currentItemId = id; app.renderForm(); },
+    // --- PAINEL LATERAL (FORMULÁRIOS) ---
+    openCreatePanel: () => {
+        if(app.currentView === 'disparo') return;
+        app.currentItemId = null;
+        app.renderForm();
+    },
+
+    editItem: (id) => {
+        app.currentItemId = id;
+        app.renderForm();
+    },
+
     closePanel: () => {
         const panel = document.getElementById('actionPanel');
-        if(panel) { document.getElementById('defaultPanelContent').style.display = 'block'; document.getElementById('dynamicForm').style.display = 'none'; panel.classList.remove('open'); }
+        if(panel) {
+            document.getElementById('defaultPanelContent').style.display = 'block';
+            document.getElementById('dynamicForm').style.display = 'none';
+            panel.classList.remove('open');
+        }
     },
 
     renderForm: () => {
         const container = document.getElementById('formFields');
         const title = document.getElementById('formTitle');
         let fields = '';
+        
         document.getElementById('defaultPanelContent').style.display = 'none';
         document.getElementById('dynamicForm').style.display = 'block';
         document.getElementById('actionPanel').classList.add('open');
 
-        // --- EDITOR DE GRUPOS (COM IMPORTAÇÃO) ---
-        if (app.currentView === 'grupos') {
+        // FORMULÁRIOS
+        if (app.currentView === 'config') {
+            const item = app.currentItemId ? app.data.settings.find(x => x.id === app.currentItemId) : { name:'', smtp_host:'', smtp_port:'587', smtp_user:'', smtp_pass:'', sender_email:'', smtp_secure:false };
+            title.innerText = app.currentItemId ? 'Editar SMTP' : 'Novo Servidor SMTP';
+            fields = `
+                <div class="form-group"><label>Nome do Perfil</label><input id="c_name" value="${item.name || ''}" placeholder="Nicopel Marketing"></div>
+                <div class="form-group"><label>Host (Servidor)</label><input id="c_host" value="${item.smtp_host || ''}" placeholder="smtp.titan.email"></div>
+                <div class="form-group"><label>Porta</label><input type="number" id="c_port" value="${item.smtp_port || 587}"></div>
+                <div class="form-group"><label>Usuário</label><input id="c_user" value="${item.smtp_user || ''}"></div>
+                <div class="form-group"><label>Senha</label><input type="text" id="c_pass" value="${item.smtp_pass || ''}"></div>
+                <div class="form-group"><label>Remetente (Opcional)</label><input id="c_sender" value="${item.sender_email || ''}"></div>
+                <div class="form-group"><label>Segurança</label><select id="c_secure"><option value="false" ${!item.smtp_secure?'selected':''}>Não (587)</option><option value="true" ${item.smtp_secure?'selected':''}>Sim (465)</option></select></div>
+            `;
+        }
+        else if (app.currentView === 'grupos') {
             const item = app.currentItemId ? app.data.grupos.find(x => x.id === app.currentItemId) : { nome: '', emails: [] };
             title.innerText = 'Editor de Grupo';
             fields = `
                 <div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div>
-                
                 <div style="margin-bottom:20px; padding:15px; border:1px dashed rgba(255,255,255,0.2); border-radius:12px; background:rgba(255,255,255,0.02);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <label style="margin:0; color:#a78bfa;">📂 Importar Planilha (CSV)</label>
+                        <label style="margin:0; color:#a78bfa;">📂 Importar CSV</label>
                         <a href="#" onclick="window.app.downloadTemplate()" style="font-size:11px; color:#fff; text-decoration:underline;">Baixar Modelo</a>
                     </div>
                     <input type="file" id="importFile" accept=".csv, .txt" class="glass-input" style="margin-bottom:10px; padding:10px;">
                     <button class="btn btn-secondary" onclick="window.app.processImport()">Ler Arquivo</button>
                 </div>
-
                 <div class="form-group">
-                    <label>E-mails (Editável)</label>
-                    <textarea id="f_emails" rows="10" placeholder="cliente@exemplo.com">${item.emails ? item.emails.join('\n') : ''}</textarea>
-                    <small style="color:#666; font-size:11px;">Total de linhas: <span id="emailCount">${item.emails ? item.emails.length : 0}</span></small>
+                    <label>E-mails</label><textarea id="f_emails" rows="10">${item.emails ? item.emails.join('\n') : ''}</textarea>
+                    <small style="color:#666; font-size:11px;">Total: <span id="emailCount">${item.emails ? item.emails.length : 0}</span></small>
                 </div>
             `;
         }
-        
+        else if (app.currentView === 'templates') {
+            const item = app.currentItemId ? app.data.templates.find(x => x.id === app.currentItemId) : { nome: '', assunto: '', html: '' };
+            title.innerText = 'Editor de Template';
+            fields = `<div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div><div class="form-group"><label>Assunto</label><input id="f_assunto" value="${item.assunto}"></div><div class="form-group"><label>HTML</label><textarea id="f_html" rows="15" style="font-family:monospace; font-size:12px;">${item.html}</textarea></div>`;
+        }
         else if (app.currentView === 'fluxos') {
             const item = app.currentItemId ? app.data.fluxos.find(x => x.id === app.currentItemId) : { nome: '', steps: [] };
-            title.innerText = app.currentItemId ? 'Editar Automação' : 'Nova Automação';
+            title.innerText = 'Editor de Fluxo';
             app.tempSteps = item.steps ? JSON.parse(JSON.stringify(item.steps)) : [];
 
             fields = `
@@ -171,17 +280,10 @@ const app = {
             `;
             setTimeout(() => app.renderStepsList(), 50);
         }
-        else if (app.currentView === 'config') {
-            const item = app.currentItemId ? app.data.settings.find(x => x.id === app.currentItemId) : { name:'', smtp_host:'', smtp_port:'587', smtp_user:'', smtp_pass:'', sender_email:'', smtp_secure:false };
-            title.innerText = 'Editar SMTP';
-            fields = `<div class="form-group"><label>Nome</label><input id="c_name" value="${item.name||''}"></div><div class="form-group"><label>Host</label><input id="c_host" value="${item.smtp_host||''}"></div><div class="form-group"><label>Porta</label><input type="number" id="c_port" value="${item.smtp_port||587}"></div><div class="form-group"><label>User</label><input id="c_user" value="${item.smtp_user||''}"></div><div class="form-group"><label>Senha</label><input type="text" id="c_pass" value="${item.smtp_pass||''}"></div><div class="form-group"><label>Remetente</label><input id="c_sender" value="${item.sender_email||''}"></div><div class="form-group"><label>SSL</label><select id="c_secure"><option value="false" ${!item.smtp_secure?'selected':''}>Não</option><option value="true" ${item.smtp_secure?'selected':''}>Sim</option></select></div>`;
-        }
-        else if (app.currentView === 'templates') {
-            const item = app.currentItemId ? app.data.templates.find(x => x.id === app.currentItemId) : { nome: '', assunto: '', html: '' };
-            title.innerText = 'Template'; fields = `<div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div><div class="form-group"><label>Assunto</label><input id="f_assunto" value="${item.assunto}"></div><div class="form-group"><label>HTML</label><textarea id="f_html" rows="15" style="font-family:monospace;">${item.html}</textarea></div>`;
-        }
 
-        if(app.currentItemId) fields += `<div style="margin-top:40px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);"><button class="btn btn-delete" onclick="window.app.deleteCurrent()">Excluir</button></div>`;
+        if(app.currentItemId) {
+            fields += `<div style="margin-top:40px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);"><button class="btn btn-delete" onclick="window.app.deleteCurrent()">Excluir Item</button></div>`;
+        }
         container.innerHTML = fields;
     },
 
@@ -204,34 +306,22 @@ const app = {
         const reader = new FileReader();
         reader.onload = function(e) {
             const text = e.target.result;
-            // Separa por quebra de linha ou vírgula
             const rawEmails = text.split(/[\n,;]+/);
-            
-            // Filtra e limpa
-            const validEmails = rawEmails
-                .map(email => email.trim())
-                .filter(email => email.includes('@') && !email.includes('email')); // Remove cabeçalho se tiver
-
+            const validEmails = rawEmails.map(email => email.trim()).filter(email => email.includes('@') && !email.includes('email'));
             const textArea = document.getElementById('f_emails');
             const currentVal = textArea.value.trim();
             
-            // Adiciona aos existentes ou substitui
-            if(currentVal) {
-                textArea.value = currentVal + '\n' + validEmails.join('\n');
-            } else {
-                textArea.value = validEmails.join('\n');
-            }
+            if(currentVal) textArea.value = currentVal + '\n' + validEmails.join('\n');
+            else textArea.value = validEmails.join('\n');
             
-            // Atualiza contador
             const total = document.getElementById('f_emails').value.split('\n').filter(e=>e.trim()).length;
             document.getElementById('emailCount').innerText = total;
-
             app.showToast(`${validEmails.length} e-mails importados!`, "success");
         };
         reader.readAsText(input.files[0]);
     },
 
-    // --- FUNÇÕES DE FLUXO ---
+    // --- FUNÇÕES DE FLUXO VISUAL ---
     renderStepsList: () => {
         const listDiv = document.getElementById('stepsList');
         if(!listDiv) return;
@@ -332,22 +422,20 @@ const app = {
         } catch(e) { app.showToast('Erro processamento', 'error'); }
     },
 
-   // ... resto do código ...
-
     startSending: async () => {
         const smtpId = document.getElementById('sendSmtp').value;
         const gid = document.getElementById('sendGrupo').value;
         const tid = document.getElementById('sendTemplate').value;
         const avulsos = document.getElementById('sendAvulsos').value;
         
-        if(!smtpId) return app.showToast('Selecione um Servidor SMTP!', 'error');
+        if(!smtpId) return app.showToast('Selecione um SMTP!', 'error');
 
         let list = [];
         if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = [...g.emails]; }
-        if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.includes('@'))];
+        if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.trim().includes('@'))];
         list = [...new Set(list)];
 
-        if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
+        if(!list.length) return app.showToast('Sem e-mails', 'error');
         if(!confirm(`Enviar para ${list.length} pessoas?`)) return;
 
         const tmpl = app.data.templates.find(x=>x.id==tid);
@@ -361,13 +449,11 @@ const app = {
         
         let successCount = 0;
         let errorCount = 0;
-        let lastError = ""; // Variável para guardar o motivo do erro
+        let lastError = "";
 
-        // Envia em lotes de 2
         for(let i=0; i<list.length; i+=2) {
             const batch = list.slice(i, i+2);
-            
-            const promises = batch.map(async (email) => {
+            await Promise.all(batch.map(async (email) => {
                 try {
                     const res = await fetch('/api/send', {
                         method:'POST', 
@@ -375,36 +461,39 @@ const app = {
                         body:JSON.stringify({email, subject:subj, html, smtpId})
                     });
                     const data = await res.json();
-                    
                     if (res.ok) {
                         successCount++;
                     } else {
                         errorCount++;
-                        console.error("Falha no envio:", data.error);
-                        lastError = data.error; // Guarda o erro pra mostrar pro usuário
+                        lastError = data.error || "Erro desconhecido";
+                        console.error("Falha no envio:", lastError);
                     }
-                } catch (e) {
+                } catch (err) {
                     errorCount++;
-                    lastError = "Erro de conexão com o servidor";
+                    lastError = "Erro de conexão";
+                    console.error(err);
                 }
-            });
-
-            await Promise.all(promises);
+            }));
             await new Promise(r=>setTimeout(r, 1000));
         }
 
         btn.disabled = false; 
         btn.innerText = "INICIAR DISPARO";
 
-        // MOSTRA O ERRO NA TELA
         if (errorCount > 0) {
-            alert(`Envio finalizado com ERROS.\n\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMOTIVO DA FALHA:\n${lastError}`);
+            alert(`Fim com erros.\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMotivo: ${lastError}`);
         } else {
             app.showToast(`Envio concluído! ${successCount} enviados.`, 'success');
         }
     },
 
-    // ... resto do código ...
+    showToast: (msg, type) => {
+        const t = document.createElement('div');
+        t.className = `toast ${type || ''}`;
+        t.innerHTML = `<span>${msg}</span>`;
+        document.getElementById('toast-container').appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
 };
 
 document.addEventListener('DOMContentLoaded', app.init);
