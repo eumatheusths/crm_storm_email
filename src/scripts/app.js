@@ -6,7 +6,7 @@ const app = {
     currentItemId: null,
     tempSteps: [], // Variável temporária para edição de fluxos
 
-    // TRADUTOR DE ROTAS (Backend <-> Frontend)
+    // TRADUTOR DE ROTAS (Backend <-> Frontend) - Corrige erros 404
     apiMap: {
         'grupos': 'groups',
         'templates': 'templates',
@@ -19,6 +19,7 @@ const app = {
     init: async () => {
         await app.fetchData();
         const view = localStorage.getItem('lastView') || 'disparo';
+        // Garante que o menu exista antes de ativar
         const navItem = document.querySelector(`.nav-item[data-target="${view}"]`) || document.querySelector('.nav-item[data-target="disparo"]');
         app.navigate(view, navItem);
         window.app = app; 
@@ -164,7 +165,6 @@ const app = {
                     <div style="display:flex; gap:10px;">
                         <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.editItem(${f.id})">EDITAR</button>
                         <button class="btn btn-secondary" style="font-size:11px; padding:8px;" onclick="window.app.iniciarFluxo(${f.id})">▶ INICIAR</button>
-                        <button class="btn btn-secondary" style="font-size:11px; padding:8px; border-color:#ef4444; color:#ef4444;" onclick="window.app.deleteCurrent(${f.id})">🗑</button>
                     </div>
                 </div>
             `}).join('');
@@ -461,6 +461,7 @@ const app = {
                         body:JSON.stringify({email, subject:subj, html, smtpId})
                     });
                     const data = await res.json();
+                    
                     if (res.ok) {
                         successCount++;
                     } else {
