@@ -6,7 +6,7 @@ const app = {
     currentItemId: null,
     tempSteps: [], // Variável temporária para edição de fluxos
 
-    // TRADUTOR DE ROTAS (Backend <-> Frontend) - Corrige erros 404
+    // TRADUTOR DE ROTAS (Backend <-> Frontend)
     apiMap: {
         'grupos': 'groups',
         'templates': 'templates',
@@ -19,7 +19,6 @@ const app = {
     init: async () => {
         await app.fetchData();
         const view = localStorage.getItem('lastView') || 'disparo';
-        // Garante que o menu exista antes de ativar
         const navItem = document.querySelector(`.nav-item[data-target="${view}"]`) || document.querySelector('.nav-item[data-target="disparo"]');
         app.navigate(view, navItem);
         window.app = app; 
@@ -428,14 +427,14 @@ const app = {
         const tid = document.getElementById('sendTemplate').value;
         const avulsos = document.getElementById('sendAvulsos').value;
         
-        if(!smtpId) return app.showToast('Selecione um SMTP!', 'error');
+        if(!smtpId) return app.showToast('Selecione um Servidor SMTP!', 'error');
 
         let list = [];
         if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = [...g.emails]; }
         if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.trim().includes('@'))];
         list = [...new Set(list)];
 
-        if(!list.length) return app.showToast('Sem e-mails', 'error');
+        if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
         if(!confirm(`Enviar para ${list.length} pessoas?`)) return;
 
         const tmpl = app.data.templates.find(x=>x.id==tid);
@@ -451,8 +450,15 @@ const app = {
         let errorCount = 0;
         let lastError = "";
 
-        for(let i=0; i<list.length; i+=2) {
-            const batch = list.slice(i, i+2);
+        // --- CONFIGURAÇÃO SEGURA PARA OUTLOOK/TITAN ---
+        const BATCH_SIZE = 5; // Envia 5 emails de uma vez
+        const DELAY_MS = 2000; // Espera 2 segundos (segurança)
+
+        for(let i=0; i<list.length; i+=BATCH_SIZE) {
+            const batch = list.slice(i, i+BATCH_SIZE);
+            
+            if(i > 0 && i % 50 === 0) app.showToast(`Enviados ${i} de ${list.length}...`, 'info');
+
             await Promise.all(batch.map(async (email) => {
                 try {
                     const res = await fetch('/api/send', {
@@ -475,14 +481,14 @@ const app = {
                     console.error(err);
                 }
             }));
-            await new Promise(r=>setTimeout(r, 1000));
+            await new Promise(r=>setTimeout(r, DELAY_MS));
         }
 
         btn.disabled = false; 
         btn.innerText = "INICIAR DISPARO";
 
         if (errorCount > 0) {
-            alert(`Fim com erros.\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMotivo: ${lastError}`);
+            alert(`Fim com erros.\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMotivo da última falha: ${lastError}`);
         } else {
             app.showToast(`Envio concluído! ${successCount} enviados.`, 'success');
         }
