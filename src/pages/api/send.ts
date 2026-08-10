@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import nodemailer from "nodemailer";
 import pool from "../../lib/db";
+import { sendViaHostingerApi } from "../../lib/hostingerMail";
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -22,13 +23,30 @@ export const POST: APIRoute = async ({ request }) => {
     const config = rows[0];
 
     if (!config) {
-        console.error("[Send API] Erro: Nenhum servidor SMTP encontrado no banco.");
-        return new Response(JSON.stringify({ error: "Nenhum servidor SMTP configurado no sistema." }), { status: 400 });
+        console.error("[Send API] Erro: Nenhum servidor de envio encontrado no banco.");
+        return new Response(JSON.stringify({ error: "Nenhum servidor de envio configurado no sistema." }), { status: 400 });
+    }
+
+    const senderName = config.sender_name || config.name || "Storm Mídia";
+    const sender = config.sender_email || config.smtp_user;
+
+    // 2. Envia usando o provedor configurado
+    if (config.provider === "hostinger_api") {
+        console.log(`[Send API] Enviando via Hostinger API (mailbox ${config.mailbox_resource_id})`);
+        await sendViaHostingerApi({
+            apiToken: config.api_token,
+            mailboxResourceId: config.mailbox_resource_id,
+            to: email,
+            subject,
+            html,
+            displayName: senderName,
+        });
+        console.log(`[Send API] Sucesso via Hostinger API!`);
+        return new Response(JSON.stringify({ success: true }));
     }
 
     console.log(`[Send API] Configuração carregada: ${config.smtp_host}:${config.smtp_port} (${config.smtp_user})`);
 
-    // 2. Cria Transporter
     const transporter = nodemailer.createTransport({
         host: config.smtp_host,
         port: Number(config.smtp_port),
@@ -41,13 +59,10 @@ export const POST: APIRoute = async ({ request }) => {
         connectionTimeout: 10000 // 10 segundos max para conectar
     });
 
-    // 3. Envia
-    const sender = config.sender_email || config.smtp_user;
-    
     const info = await transporter.sendMail({
-        from: `"Nicopel Club" <${sender}>`,
-        to: email, 
-        subject: subject, 
+        from: `"${senderName}" <${sender}>`,
+        to: email,
+        subject: subject,
         html: html
     });
 

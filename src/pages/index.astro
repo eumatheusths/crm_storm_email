@@ -177,9 +177,12 @@
             </div>
             
             <div style="padding-top: 20px; border-top: 1px solid var(--card-border);">
-                <div style="display:flex; gap:12px; align-items:center; opacity:0.6;">
-                    <div style="width:24px; height:24px; border-radius:50%; background:#333;"></div>
-                    <span style="font-size:12px;">Admin</span>
+                <div style="display:flex; gap:12px; align-items:center; justify-content:space-between; opacity:0.6;">
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <div style="width:24px; height:24px; border-radius:50%; background:#333;"></div>
+                        <span style="font-size:12px;">Admin</span>
+                    </div>
+                    <button onclick="window.app.logout()" title="Sair" style="width:auto; padding:6px 10px; background:transparent; border:1px solid var(--card-border); color:var(--text-secondary); border-radius:8px; cursor:pointer; font-size:11px;">Sair</button>
                 </div>
             </div>
         </aside>

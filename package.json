@@ -14,5 +14,9 @@
     "@types/nodemailer": "^7.0.4",
     "astro": "^5.16.2",
     "nodemailer": "^7.0.11"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^5.9.3"
   }
 }

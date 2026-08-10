@@ -111,23 +111,27 @@ const app = {
                 </div>
             `;
         } 
-        // 2. TELA DE CONFIGURAÇÕES (SMTP)
+        // 2. TELA DE CONFIGURAÇÕES (Servidores de envio)
         else if (app.currentView === 'config') {
             if(!app.data.settings.length) html = '<div class="empty-state">Nenhum servidor configurado. Adicione um novo no painel ao lado.</div>';
-            else html = app.data.settings.map(s => `
+            else html = app.data.settings.map(s => {
+                const isApi = s.provider === 'hostinger_api';
+                const subtitle = isApi ? `Hostinger API • ${s.sender_email || ''}` : `${s.smtp_host} • ${s.smtp_user}`;
+                const tag = isApi ? 'API' : `Porta ${s.smtp_port}`;
+                return `
                 <div class="card-item" onclick="window.app.editItem(${s.id})">
                     <div class="card-header">
                         <div class="card-meta">
                             <div class="avatar" style="background:#0ea5e9">S</div>
                             <div>
                                 <div class="card-title">${s.name}</div>
-                                <div class="card-preview">${s.smtp_host} • ${s.smtp_user}</div>
+                                <div class="card-preview">${subtitle}</div>
                             </div>
                         </div>
-                        <span class="tag" style="border:1px solid #333; color:#aaa;">Porta ${s.smtp_port}</span>
+                        <span class="tag" style="border:1px solid #333; color:#aaa;">${tag}</span>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
         // 3. TELA DE FLUXOS (COM ESTATÍSTICAS)
         else if (app.currentView === 'fluxos') {
@@ -228,16 +232,36 @@ const app = {
 
         // FORMULÁRIOS
         if (app.currentView === 'config') {
-            const item = app.currentItemId ? app.data.settings.find(x => x.id === app.currentItemId) : { name:'', smtp_host:'', smtp_port:'587', smtp_user:'', smtp_pass:'', sender_email:'', smtp_secure:false };
-            title.innerText = app.currentItemId ? 'Editar SMTP' : 'Novo Servidor SMTP';
+            const item = app.currentItemId ? app.data.settings.find(x => x.id === app.currentItemId) : { name:'', provider:'hostinger_api', smtp_host:'', smtp_port:'587', smtp_user:'', smtp_pass:'', sender_email:'', sender_name:'', smtp_secure:false, api_token:'' };
+            const provider = item.provider || 'hostinger_api';
+            title.innerText = app.currentItemId ? 'Editar Servidor' : 'Novo Servidor de Envio';
             fields = `
-                <div class="form-group"><label>Nome do Perfil</label><input id="c_name" value="${item.name || ''}" placeholder="Nicopel Marketing"></div>
-                <div class="form-group"><label>Host (Servidor)</label><input id="c_host" value="${item.smtp_host || ''}" placeholder="smtp.titan.email"></div>
-                <div class="form-group"><label>Porta</label><input type="number" id="c_port" value="${item.smtp_port || 587}"></div>
-                <div class="form-group"><label>Usuário</label><input id="c_user" value="${item.smtp_user || ''}"></div>
-                <div class="form-group"><label>Senha</label><input type="text" id="c_pass" value="${item.smtp_pass || ''}"></div>
-                <div class="form-group"><label>Remetente (Opcional)</label><input id="c_sender" value="${item.sender_email || ''}"></div>
-                <div class="form-group"><label>Segurança</label><select id="c_secure"><option value="false" ${!item.smtp_secure?'selected':''}>Não (587)</option><option value="true" ${item.smtp_secure?'selected':''}>Sim (465)</option></select></div>
+                <div class="form-group"><label>Nome do Perfil</label><input id="c_name" value="${item.name || ''}" placeholder="Storm Mídia"></div>
+                <div class="form-group">
+                    <label>Como enviar</label>
+                    <select id="c_provider" onchange="window.app.toggleProviderFields(this.value)">
+                        <option value="hostinger_api" ${provider==='hostinger_api'?'selected':''}>API de E-mail da Hostinger</option>
+                        <option value="smtp" ${provider==='smtp'?'selected':''}>SMTP</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>E-mail Remetente</label><input id="c_sender" value="${item.sender_email || ''}" placeholder="contato@stormmidia.com.br"></div>
+                <div class="form-group"><label>Nome de Exibição do Remetente</label><input id="c_sendername" value="${item.sender_name || ''}" placeholder="Storm Mídia"></div>
+
+                <div id="apiFields" style="display:${provider==='hostinger_api'?'block':'none'};">
+                    <div class="form-group">
+                        <label>Token da API (Hostinger → E-mails → Desenvolvedores → Chaves de API)</label>
+                        <input type="text" id="c_apitoken" value="${item.api_token || ''}" placeholder="Cole o token aqui">
+                        <small style="color:#666; font-size:11px;">O token precisa ter acesso à caixa acima. Ao salvar, validamos com a Hostinger.</small>
+                    </div>
+                </div>
+
+                <div id="smtpFields" style="display:${provider==='smtp'?'block':'none'};">
+                    <div class="form-group"><label>Host (Servidor)</label><input id="c_host" value="${item.smtp_host || ''}" placeholder="smtp.hostinger.com"></div>
+                    <div class="form-group"><label>Porta</label><input type="number" id="c_port" value="${item.smtp_port || 587}"></div>
+                    <div class="form-group"><label>Usuário</label><input id="c_user" value="${item.smtp_user || ''}"></div>
+                    <div class="form-group"><label>Senha</label><input type="text" id="c_pass" value="${item.smtp_pass || ''}"></div>
+                    <div class="form-group"><label>Segurança</label><select id="c_secure"><option value="false" ${!item.smtp_secure?'selected':''}>Não (587)</option><option value="true" ${item.smtp_secure?'selected':''}>Sim (465)</option></select></div>
+                </div>
             `;
         }
         else if (app.currentView === 'grupos') {
@@ -355,6 +379,11 @@ const app = {
         listDiv.innerHTML = html;
     },
 
+    toggleProviderFields: (provider) => {
+        document.getElementById('apiFields').style.display = provider === 'hostinger_api' ? 'block' : 'none';
+        document.getElementById('smtpFields').style.display = provider === 'smtp' ? 'block' : 'none';
+    },
+
     addStep: () => { app.tempSteps.push({ templateId: "", delay: 5, unit: 'minutes' }); app.renderStepsList(); },
     removeStep: (i) => { app.tempSteps.splice(i, 1); app.renderStepsList(); },
     updateStep: (i, f, v) => { app.tempSteps[i][f] = v; },
@@ -371,7 +400,23 @@ const app = {
             body = { id, nome, steps: app.tempSteps };
         }
         else if (app.currentView === 'config') {
-            body = { id, name: document.getElementById('c_name').value, host: document.getElementById('c_host').value, port: document.getElementById('c_port').value, user: document.getElementById('c_user').value, pass: document.getElementById('c_pass').value, sender: document.getElementById('c_sender').value, secure: document.getElementById('c_secure').value === "true" };
+            const provider = document.getElementById('c_provider').value;
+            body = {
+                id,
+                name: document.getElementById('c_name').value,
+                provider,
+                sender: document.getElementById('c_sender').value,
+                senderName: document.getElementById('c_sendername').value,
+            };
+            if (provider === 'hostinger_api') {
+                body.apiToken = document.getElementById('c_apitoken').value;
+            } else {
+                body.host = document.getElementById('c_host').value;
+                body.port = document.getElementById('c_port').value;
+                body.user = document.getElementById('c_user').value;
+                body.pass = document.getElementById('c_pass').value;
+                body.secure = document.getElementById('c_secure').value === "true";
+            }
         }
         else if (app.currentView === 'grupos') {
             body = { id, nome: document.getElementById('f_nome').value, emails: document.getElementById('f_emails').value.split('\n').map(e=>e.trim()).filter(e=>e.includes('@')) };
@@ -383,8 +428,9 @@ const app = {
         const endpoint = app.apiMap[app.currentView];
         try {
             const res = await fetch(`/api/${endpoint}`, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-            if(res.ok) { app.showToast('Salvo!', 'success'); app.fetchData().then(() => app.renderList()); app.closePanel(); } 
-            else app.showToast('Erro ao salvar.', 'error');
+            const data = await res.json().catch(() => ({}));
+            if(res.ok) { app.showToast('Salvo!', 'success'); app.fetchData().then(() => app.renderList()); app.closePanel(); }
+            else app.showToast(data.error || 'Erro ao salvar.', 'error');
         } catch(e) { app.showToast('Erro conexão.', 'error'); }
     },
 
@@ -492,6 +538,11 @@ const app = {
         } else {
             app.showToast(`Envio concluído! ${successCount} enviados.`, 'success');
         }
+    },
+
+    logout: async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/login';
     },
 
     showToast: (msg, type) => {

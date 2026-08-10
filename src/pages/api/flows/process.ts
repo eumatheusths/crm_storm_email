@@ -1,18 +1,34 @@
 import type { APIRoute } from "astro";
 import pool from "../../../lib/db";
 import nodemailer from "nodemailer";
+import { sendViaHostingerApi } from "../../../lib/hostingerMail";
+import { isValidSession, SESSION_COOKIE } from "../../../lib/auth";
 
-export const GET: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async ({ request, cookies }) => {
   try {
-    const siteUrl = new URL(request.url).origin; 
+    // Este endpoint fica fora do gate de login (o Vercel Cron não manda cookie de sessão).
+    // Aceita OU o segredo do cron OU uma sessão de admin já autenticada (clique manual no painel).
+    const cronSecret = import.meta.env.CRON_SECRET;
+    const authHeader = request.headers.get("authorization");
+    const hasValidCronSecret = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const hasValidSession = await isValidSession(cookies.get(SESSION_COOKIE)?.value);
 
-    // 1. Configurar SMTP (Pega o primeiro configurado)
+    if (!hasValidCronSecret && !hasValidSession) {
+        return new Response("Unauthorized", { status: 401 });
+    }
+
+    const siteUrl = new URL(request.url).origin;
+
+    // 1. Configurar envio (Pega o primeiro configurado)
     const settingsRes = await pool.query("SELECT * FROM settings LIMIT 1");
     const config = settingsRes.rows[0];
-    
-    if (!config) return new Response("Sem SMTP configurado", { status: 500 });
 
-    const transporter = nodemailer.createTransport({
+    if (!config) return new Response("Sem servidor de envio configurado", { status: 500 });
+
+    const senderName = config.sender_name || config.name || "Storm Mídia";
+    const isHostingerApi = config.provider === "hostinger_api";
+
+    const transporter = isHostingerApi ? null : nodemailer.createTransport({
         host: config.smtp_host,
         port: Number(config.smtp_port),
         secure: config.smtp_secure,
@@ -25,10 +41,10 @@ export const GET: APIRoute = async ({ request }) => {
 
     // 2. Buscar tarefas pendentes (Hora de execução <= AGORA e status 'pending')
     const tasks = await pool.query(`
-        SELECT t.*, f.steps 
+        SELECT t.*, f.steps
         FROM flow_tracking t
         JOIN flows f ON t.flow_id = f.id
-        WHERE t.status = 'pending' 
+        WHERE t.status = 'pending'
         AND t.next_execution_at <= NOW()
         AND f.active = true
         LIMIT 20
@@ -49,10 +65,10 @@ export const GET: APIRoute = async ({ request }) => {
         try {
             // Busca o HTML do template
             const templateRes = await pool.query("SELECT * FROM templates WHERE id = $1", [currentStep.templateId]);
-            
+
             if (templateRes.rows.length > 0) {
                 const tmpl = templateRes.rows[0];
-                
+
                 // A. Cria Log de Envio para estatísticas
                 const logRes = await pool.query(
                     "INSERT INTO email_logs (flow_id, step_index, email, template_id) VALUES ($1, $2, $3, $4) RETURNING id",
@@ -65,12 +81,23 @@ export const GET: APIRoute = async ({ request }) => {
                 const finalHtml = tmpl.html + trackingPixel;
 
                 // C. Envia
-                await transporter.sendMail({
-                    from: `"Nicopel Auto" <${config.sender_email || config.smtp_user}>`,
-                    to: task.email,
-                    subject: tmpl.assunto,
-                    html: finalHtml
-                });
+                if (isHostingerApi) {
+                    await sendViaHostingerApi({
+                        apiToken: config.api_token,
+                        mailboxResourceId: config.mailbox_resource_id,
+                        to: task.email,
+                        subject: tmpl.assunto,
+                        html: finalHtml,
+                        displayName: senderName,
+                    });
+                } else {
+                    await transporter!.sendMail({
+                        from: `"${senderName}" <${config.sender_email || config.smtp_user}>`,
+                        to: task.email,
+                        subject: tmpl.assunto,
+                        html: finalHtml
+                    });
+                }
             }
 
             // D. Agendar Próximo Passo
@@ -81,23 +108,23 @@ export const GET: APIRoute = async ({ request }) => {
                 // Calcula o tempo do próximo
                 const delay = parseInt(nextStepData.delay) || 0;
                 // Se não tiver unidade definida, usa 'hours' como padrão
-                const unit = nextStepData.unit || 'hours'; 
-                
+                const unit = nextStepData.unit || 'hours';
+
                 // Validação de segurança para a query SQL (evita injeção)
                 const validUnits = ['minutes', 'hours', 'days'];
                 const safeUnit = validUnits.includes(unit) ? unit : 'hours';
 
                 // Postgres aceita interval '5 minutes', '1 hours', etc.
                 await pool.query(`
-                    UPDATE flow_tracking 
-                    SET current_step_index = $1, next_execution_at = NOW() + interval '${delay} ${safeUnit}' 
+                    UPDATE flow_tracking
+                    SET current_step_index = $1, next_execution_at = NOW() + interval '${delay} ${safeUnit}'
                     WHERE id = $2
                 `, [nextIndex, task.id]);
             } else {
                 // Não tem mais passos, finaliza
                 await pool.query("UPDATE flow_tracking SET status = 'completed' WHERE id = $1", [task.id]);
             }
-            
+
             processed++;
 
         } catch (err) {

@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import pool from "../../lib/db";
+import { resolveHostingerMailbox } from "../../lib/hostingerMail";
 
 // LISTAR (GET)
 export const GET: APIRoute = async () => {
@@ -9,7 +10,7 @@ export const GET: APIRoute = async () => {
     return new Response(JSON.stringify(rows));
   } catch (e: any) {
     console.error("Erro GET Settings:", e);
-    return new Response(JSON.stringify([])); 
+    return new Response(JSON.stringify([]));
   }
 };
 
@@ -17,25 +18,34 @@ export const GET: APIRoute = async () => {
 export const POST: APIRoute = async ({ request }) => {
   try {
     const data = await request.json();
-    console.log("Tentando salvar:", data); // Log para debug
+    console.log("Tentando salvar:", { ...data, pass: data.pass ? "***" : undefined, apiToken: data.apiToken ? "***" : undefined });
+
+    let mailboxResourceId: string | null = null;
+    if (data.provider === "hostinger_api") {
+      mailboxResourceId = await resolveHostingerMailbox(data.apiToken, data.sender);
+    }
 
     await pool.query(`
-        INSERT INTO settings (name, smtp_host, smtp_port, smtp_user, smtp_pass, sender_email, smtp_secure)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO settings (name, smtp_host, smtp_port, smtp_user, smtp_pass, sender_email, smtp_secure, provider, api_token, mailbox_resource_id, sender_name)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     `, [
-        data.name || 'Servidor', 
-        data.host, 
-        data.port, 
-        data.user, 
-        data.pass, 
-        data.sender, 
-        data.secure
+        data.name || 'Servidor',
+        data.host,
+        data.port,
+        data.user,
+        data.pass,
+        data.sender,
+        data.secure,
+        data.provider || 'smtp',
+        data.apiToken || null,
+        mailboxResourceId,
+        data.senderName || null,
     ]);
-    
+
     return new Response(JSON.stringify({ success: true }));
-  } catch (e: any) { 
+  } catch (e: any) {
     console.error("Erro POST Settings:", e);
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 }); 
+    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
 };
 
@@ -43,27 +53,37 @@ export const POST: APIRoute = async ({ request }) => {
 export const PUT: APIRoute = async ({ request }) => {
   try {
     const data = await request.json();
-    
+
+    let mailboxResourceId: string | null = null;
+    if (data.provider === "hostinger_api") {
+      mailboxResourceId = await resolveHostingerMailbox(data.apiToken, data.sender);
+    }
+
     await pool.query(`
-        UPDATE settings SET 
-        name = $1, smtp_host = $2, smtp_port = $3, smtp_user = $4, 
-        smtp_pass = $5, sender_email = $6, smtp_secure = $7
-        WHERE id = $8
+        UPDATE settings SET
+        name = $1, smtp_host = $2, smtp_port = $3, smtp_user = $4,
+        smtp_pass = $5, sender_email = $6, smtp_secure = $7,
+        provider = $8, api_token = $9, mailbox_resource_id = $10, sender_name = $11
+        WHERE id = $12
     `, [
-        data.name, 
-        data.host, 
-        data.port, 
-        data.user, 
-        data.pass, 
-        data.sender, 
-        data.secure, 
+        data.name,
+        data.host,
+        data.port,
+        data.user,
+        data.pass,
+        data.sender,
+        data.secure,
+        data.provider || 'smtp',
+        data.apiToken || null,
+        mailboxResourceId,
+        data.senderName || null,
         data.id
     ]);
 
     return new Response(JSON.stringify({ success: true }));
-  } catch (e: any) { 
+  } catch (e: any) {
     console.error("Erro PUT Settings:", e);
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 }); 
+    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
 };
 
@@ -73,7 +93,7 @@ export const DELETE: APIRoute = async ({ request }) => {
     const { id } = await request.json();
     await pool.query("DELETE FROM settings WHERE id = $1", [id]);
     return new Response(JSON.stringify({ success: true }));
-  } catch (e: any) { 
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 }); 
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
 };

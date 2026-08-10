@@ -27,6 +27,12 @@ export const GET: APIRoute = async () => {
     // Este comando adiciona a coluna 'name' se ela estiver faltando.
     await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS name TEXT DEFAULT 'Meu Servidor'`);
 
+    // Suporte a múltiplos provedores de envio (SMTP clássico ou API da Hostinger)
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'smtp'`);
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS api_token TEXT`);
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS mailbox_resource_id TEXT`);
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS sender_name TEXT`);
+
     return new Response("Banco de dados corrigido e atualizado com sucesso! 🚀 Tente salvar agora.");
   } catch (error: any) {
     return new Response("Erro no setup: " + error.message, { status: 500 });

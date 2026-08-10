@@ -1,43 +1,39 @@
-# Astro Starter Kit: Minimal
+# Storm Email Pro
 
-```sh
-npm create astro@latest -- --template minimal
-```
+Painel interno de disparo de e-mail em massa, grupos de contatos, templates e fluxos automatizados (drip campaigns) com rastreamento de abertura.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Stack
 
-## 🚀 Project Structure
+- [Astro](https://astro.build) (`output: server`) + adapter `@astrojs/vercel`
+- Postgres via [Neon](https://neon.tech) (`@neondatabase/serverless`)
+- Envio de e-mail: [API de E-mail da Hostinger](https://api.mail.hostinger.com/) (padrão) ou SMTP via `nodemailer`
 
-Inside of your Astro project, you'll see the following folders and files:
+## Configuração
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+1. Copie `.env.example` para `.env` e preencha:
+   - `DATABASE_URL`: connection string do Postgres (Neon).
+   - `APP_PASSWORD`: senha única exigida para acessar o painel. **Obrigatória** — sem ela o middleware bloqueia todo o app.
+   - `CRON_SECRET` (opcional): protege o endpoint `/api/flows/process` contra chamadas externas; configure o mesmo valor no Vercel Cron.
+2. Instale as dependências e rode:
+   ```sh
+   npm install
+   npm run dev
+   ```
+3. Acesse `/api/setup` uma vez para criar/atualizar as tabelas no banco.
+4. Faça login com a `APP_PASSWORD` e cadastre um servidor de envio em **Configurações**:
+   - **API de E-mail da Hostinger** (recomendado): gere um token em *E-mails → Desenvolvedores → Chaves de API* no hPanel e informe o e-mail remetente + token. O sistema valida o token e resolve a caixa automaticamente ao salvar.
+   - **SMTP**: host, porta, usuário e senha da caixa de e-mail.
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+## Automação de fluxos (drip campaigns)
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+O processamento da fila (`/api/flows/process`) precisa ser chamado periodicamente para enviar os próximos passos de cada fluxo ativo. Isso é feito via [Vercel Cron](https://vercel.com/docs/cron-jobs), configurado em `vercel.json`.
 
-Any static assets, like images, can be placed in the `public/` directory.
+> No plano Hobby da Vercel, cron jobs só podem rodar 1x/dia. Para intervalos menores (ex.: a cada 30 min, como configurado aqui) é necessário o plano Pro, ou usar um serviço externo (ex. cron-job.org) apontando para essa URL com o header `Authorization: Bearer <CRON_SECRET>`.
 
-## 🧞 Commands
+## Comandos
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+| Comando           | Ação                                          |
+| :---------------- | :--------------------------------------------- |
+| `npm run dev`     | Servidor local em `localhost:4321`             |
+| `npm run build`   | Build de produção em `./dist/`                 |
+| `npm run preview` | Preview do build local                         |
