@@ -16,7 +16,7 @@ function parseContatoLine(line) {
 
 const app = {
     currentView: 'disparo',
-    data: { grupos: [], templates: [], fluxos: [], settings: [] },
+    data: { grupos: [], templates: [], fluxos: [], settings: [], logs: [] },
     currentItemId: null,
     tempSteps: [], // Variável temporária para edição de fluxos
 
@@ -26,7 +26,8 @@ const app = {
         'templates': 'templates',
         'fluxos': 'flows',
         'config': 'settings',
-        'disparo': 'send'
+        'disparo': 'send',
+        'historico': 'logs'
     },
 
     // --- INICIALIZAÇÃO ---
@@ -66,9 +67,10 @@ const app = {
             'grupos': ['Grupos', 'Gerencie seus contatos'],
             'templates': ['Templates', 'Modelos de e-mail'],
             'fluxos': ['Fluxos', 'Automação e Estatísticas'],
-            'config': ['Servidores SMTP', 'Canais de envio']
+            'config': ['Servidores SMTP', 'Canais de envio'],
+            'historico': ['Histórico de Envios', 'Status de entrega e abertura']
         };
-        
+
         if(titles[view]) {
             const titleEl = document.getElementById('pageTitle');
             const subEl = document.getElementById('pageSubtitle');
@@ -78,8 +80,15 @@ const app = {
 
         app.renderList();
         app.closePanel();
-        
-        if (view === 'config') app.renderForm(); 
+
+        if (view === 'config') app.renderForm();
+        if (view === 'historico') app.fetchLogs().then(() => app.renderList());
+    },
+
+    fetchLogs: async () => {
+        try {
+            app.data.logs = await fetch('/api/logs').then(r => r.json());
+        } catch (e) { console.error("Erro ao carregar histórico:", e); }
     },
 
     // --- RENDERIZAÇÃO DAS LISTAS (GRID) ---
@@ -210,13 +219,46 @@ const app = {
                 </div>
             `).join('');
         }
+        // 6. HISTÓRICO (status de entrega e abertura)
+        else if (app.currentView === 'historico') {
+            if (!app.data.logs.length) {
+                html = '<div class="empty-state">Nenhum e-mail enviado ainda.</div>';
+            } else {
+                html = app.data.logs.map(l => {
+                    const data = new Date(l.created_at).toLocaleString('pt-BR');
+                    const enviado = l.status === 'failed'
+                        ? `<span class="tag" style="border:1px solid #ef4444; color:#ef4444;">Falhou</span>`
+                        : `<span class="tag" style="border:1px solid #10b981; color:#10b981;">Enviado</span>`;
+                    const aberto = l.opened_at
+                        ? `<span class="tag" style="border:1px solid #10b981; color:#10b981;">Aberto ${new Date(l.opened_at).toLocaleString('pt-BR')}</span>`
+                        : `<span class="tag" style="border:1px solid #333; color:#aaa;">Não aberto</span>`;
+                    return `
+                    <div class="card-item" style="cursor:default;">
+                        <div class="card-header">
+                            <div class="card-meta">
+                                <div class="avatar" style="background:#333">H</div>
+                                <div>
+                                    <div class="card-title">${l.email}</div>
+                                    <div class="card-preview">${l.assunto || '(sem assunto)'} • ${data}</div>
+                                    ${l.error ? `<div class="card-preview" style="color:#ef4444;">${l.error}</div>` : ''}
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                                ${enviado}
+                                ${aberto}
+                            </div>
+                        </div>
+                    </div>
+                `}).join('');
+            }
+        }
 
         container.innerHTML = html;
     },
 
     // --- PAINEL LATERAL (FORMULÁRIOS) ---
     openCreatePanel: () => {
-        if(app.currentView === 'disparo') return;
+        if(app.currentView === 'disparo' || app.currentView === 'historico') return;
         app.currentItemId = null;
         app.renderForm();
     },
@@ -568,7 +610,7 @@ const app = {
                     const res = await fetch('/api/send', {
                         method:'POST',
                         headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({email: contato.email, subject, html, smtpId})
+                        body:JSON.stringify({email: contato.email, subject, html, smtpId, templateId: tid || null})
                     });
                     const data = await res.json();
                     

@@ -62,6 +62,12 @@ export const GET: APIRoute = async () => {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_flow_id ON email_logs (flow_id);`);
 
+    // Histórico do disparo manual (antes só os fluxos automáticos eram registrados aqui).
+    await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS assunto TEXT`);
+    await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'sent'`);
+    await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS error TEXT`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON email_logs (created_at DESC);`);
+
     return new Response("Banco de dados corrigido e atualizado com sucesso! 🚀 Tente salvar agora.");
   } catch (error: any) {
     return new Response("Erro no setup: " + error.message, { status: 500 });

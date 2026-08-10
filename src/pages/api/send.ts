@@ -4,8 +4,10 @@ import pool from "../../lib/db";
 import { sendViaHostingerApi } from "../../lib/hostingerMail";
 
 export const POST: APIRoute = async ({ request }) => {
+  let logId: number | null = null;
+
   try {
-    const { email, subject, html, smtpId } = await request.json();
+    const { email, subject, html, smtpId, templateId } = await request.json();
 
     console.log(`[Send API] Iniciando envio para: ${email} usando SMTP ID: ${smtpId}`);
 
@@ -29,8 +31,21 @@ export const POST: APIRoute = async ({ request }) => {
 
     const senderName = config.sender_name || config.name || "Storm Mídia";
     const sender = config.sender_email || config.smtp_user;
+    const alwaysBcc = import.meta.env.ALWAYS_BCC;
 
-    // 2. Envia usando o provedor configurado
+    // 2. Registra o log ANTES de enviar (assim falhas de envio também ficam visíveis no Histórico)
+    // e monta o pixel de rastreamento de abertura, igual aos fluxos automáticos.
+    const logRes = await pool.query(
+        "INSERT INTO email_logs (email, template_id, assunto, status) VALUES ($1, $2, $3, 'sent') RETURNING id",
+        [email, templateId || null, subject]
+    );
+    logId = logRes.rows[0].id;
+
+    const siteUrl = new URL(request.url).origin;
+    const trackingPixel = `<img src="${siteUrl}/api/track?id=${logId}" width="1" height="1" style="display:none;" alt="" />`;
+    const finalHtml = html + trackingPixel;
+
+    // 3. Envia usando o provedor configurado
     if (config.provider === "hostinger_api") {
         console.log(`[Send API] Enviando via Hostinger API (mailbox ${config.mailbox_resource_id})`);
         await sendViaHostingerApi({
@@ -38,8 +53,9 @@ export const POST: APIRoute = async ({ request }) => {
             mailboxResourceId: config.mailbox_resource_id,
             to: email,
             subject,
-            html,
+            html: finalHtml,
             displayName: senderName,
+            bcc: alwaysBcc ? [alwaysBcc] : undefined,
         });
         console.log(`[Send API] Sucesso via Hostinger API!`);
         return new Response(JSON.stringify({ success: true }));
@@ -63,7 +79,8 @@ export const POST: APIRoute = async ({ request }) => {
         from: `"${senderName}" <${sender}>`,
         to: email,
         subject: subject,
-        html: html
+        html: finalHtml,
+        bcc: alwaysBcc || undefined,
     });
 
     console.log(`[Send API] Sucesso! MessageID: ${info.messageId}`);
@@ -71,6 +88,9 @@ export const POST: APIRoute = async ({ request }) => {
 
   } catch (error: any) {
     console.error("[Send API] ERRO CRÍTICO:", error);
+    if (logId) {
+        await pool.query("UPDATE email_logs SET status = 'failed', error = $1 WHERE id = $2", [error.message, logId]).catch(() => {});
+    }
     // Retorna o erro exato para o Frontend mostrar
     return new Response(JSON.stringify({ error: error.message || "Erro desconhecido no envio" }), { status: 500 });
   }

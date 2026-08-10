@@ -30,6 +30,7 @@ export async function sendViaHostingerApi(opts: {
   subject: string;
   html: string;
   displayName?: string;
+  bcc?: string[];
 }): Promise<void> {
   const res = await fetch(`${HOSTINGER_API_BASE}/mailboxes/${opts.mailboxResourceId}/send`, {
     method: "POST",
@@ -42,6 +43,7 @@ export async function sendViaHostingerApi(opts: {
       subject: opts.subject,
       html: opts.html,
       ...(opts.displayName ? { displayName: opts.displayName } : {}),
+      ...(opts.bcc && opts.bcc.length ? { bcc: opts.bcc } : {}),
     }),
   });
 

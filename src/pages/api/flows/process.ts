@@ -28,6 +28,7 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
     const senderName = config.sender_name || config.name || "Storm Mídia";
     const isHostingerApi = config.provider === "hostinger_api";
+    const alwaysBcc = import.meta.env.ALWAYS_BCC;
 
     const transporter = isHostingerApi ? null : nodemailer.createTransport({
         host: config.smtp_host,
@@ -63,6 +64,8 @@ export const GET: APIRoute = async ({ request, cookies }) => {
             continue;
         }
 
+        let logId: number | null = null;
+
         try {
             // Busca o HTML do template
             const templateRes = await pool.query("SELECT * FROM templates WHERE id = $1", [currentStep.templateId]);
@@ -70,17 +73,17 @@ export const GET: APIRoute = async ({ request, cookies }) => {
             if (templateRes.rows.length > 0) {
                 const tmpl = templateRes.rows[0];
                 const vars = { nome: task.nome || "", email: task.email };
+                const finalSubject = mergeTemplate(tmpl.assunto, vars);
 
-                // A. Cria Log de Envio para estatísticas
+                // A. Cria Log de Envio para estatísticas e Histórico
                 const logRes = await pool.query(
-                    "INSERT INTO email_logs (flow_id, step_index, email, template_id) VALUES ($1, $2, $3, $4) RETURNING id",
-                    [task.flow_id, task.current_step_index, task.email, tmpl.id]
+                    "INSERT INTO email_logs (flow_id, step_index, email, template_id, assunto, status) VALUES ($1, $2, $3, $4, $5, 'sent') RETURNING id",
+                    [task.flow_id, task.current_step_index, task.email, tmpl.id, finalSubject]
                 );
-                const logId = logRes.rows[0].id;
+                logId = logRes.rows[0].id;
 
                 // B. Personaliza (ex: {{nome}}) e injeta Pixel de Rastreamento (Imagem invisível)
                 const trackingPixel = `<img src="${siteUrl}/api/track?id=${logId}" width="1" height="1" style="display:none;" alt="" />`;
-                const finalSubject = mergeTemplate(tmpl.assunto, vars);
                 const finalHtml = mergeTemplate(tmpl.html, vars) + trackingPixel;
 
                 // C. Envia
@@ -92,13 +95,15 @@ export const GET: APIRoute = async ({ request, cookies }) => {
                         subject: finalSubject,
                         html: finalHtml,
                         displayName: senderName,
+                        bcc: alwaysBcc ? [alwaysBcc] : undefined,
                     });
                 } else {
                     await transporter!.sendMail({
                         from: `"${senderName}" <${config.sender_email || config.smtp_user}>`,
                         to: task.email,
                         subject: finalSubject,
-                        html: finalHtml
+                        html: finalHtml,
+                        bcc: alwaysBcc || undefined,
                     });
                 }
             }
@@ -130,8 +135,11 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
             processed++;
 
-        } catch (err) {
+        } catch (err: any) {
             console.error("Erro ao processar fluxo para " + task.email, err);
+            if (logId) {
+                await pool.query("UPDATE email_logs SET status = 'failed', error = $1 WHERE id = $2", [err.message, logId]).catch(() => {});
+            }
         }
     }
 
