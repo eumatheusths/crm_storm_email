@@ -1,4 +1,18 @@
 // src/scripts/app.js
+import { mergeTemplate } from '../lib/mailMerge';
+
+// Converte um contato salvo (string antiga OU objeto novo {email, nome}) num formato único
+function normalizeContato(item) {
+    if (typeof item === 'string') return { email: item, nome: '' };
+    return { email: item.email, nome: item.nome || '' };
+}
+
+// Uma linha "Nome, email@exemplo.com" -> {nome, email}. Sem vírgula, vira {nome:'', email: linha}.
+function parseContatoLine(line) {
+    const idx = line.indexOf(',');
+    if (idx === -1) return { nome: '', email: line.trim() };
+    return { nome: line.slice(0, idx).trim(), email: line.slice(idx + 1).trim() };
+}
 
 const app = {
     currentView: 'disparo',
@@ -82,7 +96,7 @@ const app = {
             if (smtps.length === 0) {
                 smtpOptions = `<option value="">⚠️ Configure um SMTP na aba Configurações</option>`;
             } else {
-                smtpOptions += smtps.map(s => `<option value="${s.id}">${s.name} (${s.smtp_user})</option>`).join('');
+                smtpOptions += smtps.map(s => `<option value="${s.id}">${s.name} (${s.smtp_user || s.sender_email || ''})</option>`).join('');
             }
 
             html = `
@@ -100,8 +114,8 @@ const app = {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Ou e-mails avulsos</label>
-                        <textarea id="sendAvulsos" rows="3" placeholder="email@exemplo.com"></textarea>
+                        <label>Ou contatos avulsos (Nome, E-mail — um por linha)</label>
+                        <textarea id="sendAvulsos" rows="3" placeholder="Maria Silva, maria@exemplo.com"></textarea>
                     </div>
                     <div class="form-group">
                         <label>Template</label>
@@ -267,6 +281,7 @@ const app = {
         else if (app.currentView === 'grupos') {
             const item = app.currentItemId ? app.data.grupos.find(x => x.id === app.currentItemId) : { nome: '', emails: [] };
             title.innerText = 'Editor de Grupo';
+            const linhas = (item.emails || []).map(normalizeContato).map(c => c.nome ? `${c.nome}, ${c.email}` : c.email);
             fields = `
                 <div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div>
                 <div style="margin-bottom:20px; padding:15px; border:1px dashed rgba(255,255,255,0.2); border-radius:12px; background:rgba(255,255,255,0.02);">
@@ -276,17 +291,19 @@ const app = {
                     </div>
                     <input type="file" id="importFile" accept=".csv, .txt" class="glass-input" style="margin-bottom:10px; padding:10px;">
                     <button class="btn btn-secondary" onclick="window.app.processImport()">Ler Arquivo</button>
+                    <small style="color:#666; font-size:11px; display:block; margin-top:8px;">Aceita CSV com colunas de nome (Nome/Cliente) e Email, em qualquer ordem.</small>
                 </div>
                 <div class="form-group">
-                    <label>E-mails</label><textarea id="f_emails" rows="10">${item.emails ? item.emails.join('\n') : ''}</textarea>
-                    <small style="color:#666; font-size:11px;">Total: <span id="emailCount">${item.emails ? item.emails.length : 0}</span></small>
+                    <label>Contatos (Nome, E-mail — um por linha)</label>
+                    <textarea id="f_emails" rows="10" placeholder="Maria Silva, maria@exemplo.com">${linhas.join('\n')}</textarea>
+                    <small style="color:#666; font-size:11px;">Total: <span id="emailCount">${linhas.length}</span></small>
                 </div>
             `;
         }
         else if (app.currentView === 'templates') {
             const item = app.currentItemId ? app.data.templates.find(x => x.id === app.currentItemId) : { nome: '', assunto: '', html: '' };
             title.innerText = 'Editor de Template';
-            fields = `<div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div><div class="form-group"><label>Assunto</label><input id="f_assunto" value="${item.assunto}"></div><div class="form-group"><label>HTML</label><textarea id="f_html" rows="15" style="font-family:monospace; font-size:12px;">${item.html}</textarea></div>`;
+            fields = `<div class="form-group"><label>Nome</label><input id="f_nome" value="${item.nome}"></div><div class="form-group"><label>Assunto</label><input id="f_assunto" value="${item.assunto}"></div><div class="form-group"><label>HTML</label><textarea id="f_html" rows="15" style="font-family:monospace; font-size:12px;">${item.html}</textarea><small style="color:#666; font-size:11px;">Use <code>{{nome}}</code> no assunto ou no HTML para personalizar com o nome de cada contato.</small></div>`;
         }
         else if (app.currentView === 'fluxos') {
             const item = app.currentItemId ? app.data.fluxos.find(x => x.id === app.currentItemId) : { nome: '', steps: [] };
@@ -312,34 +329,67 @@ const app = {
 
     // --- IMPORTAÇÃO DE CSV ---
     downloadTemplate: () => {
-        const csvContent = "data:text/csv;charset=utf-8,email\ncliente1@exemplo.com\ncliente2@exemplo.com";
+        const csvContent = "data:text/csv;charset=utf-8,nome,email\nCliente Exemplo,cliente1@exemplo.com\nOutro Cliente,cliente2@exemplo.com";
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "modelo_importacao_nicopel.csv");
+        link.setAttribute("download", "modelo_importacao_storm.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     },
 
+    // Lê um CSV/TXT com nome+e-mail. Detecta automaticamente as colunas pelo
+    // cabeçalho (aceita "Nome"/"Cliente" e "Email"/"E-mail", em qualquer ordem
+    // e com outras colunas no meio, tipo CPF). Sem cabeçalho reconhecido, cai
+    // no modo antigo (só e-mails, uma coluna).
     processImport: () => {
         const input = document.getElementById('importFile');
         if (!input.files || !input.files[0]) return app.showToast("Selecione um arquivo .csv", "error");
 
+        const splitRow = (row) => row.split(/[,;\t]/).map(c => c.trim().replace(/^"|"$/g, ''));
+        const NOME_KEYS = ['nome', 'cliente', 'name', 'contato'];
+        const EMAIL_KEYS = ['email', 'e-mail', 'mail'];
+
         const reader = new FileReader();
         reader.onload = function(e) {
-            const text = e.target.result;
-            const rawEmails = text.split(/[\n,;]+/);
-            const validEmails = rawEmails.map(email => email.trim()).filter(email => email.includes('@') && !email.includes('email'));
+            const rows = String(e.target.result).split(/\r?\n/).map(r => r.trim()).filter(r => r.length);
+            if (!rows.length) return app.showToast("Arquivo vazio", "error");
+
+            const header = splitRow(rows[0]).map(c => c.toLowerCase());
+            const emailCol = header.findIndex(c => EMAIL_KEYS.some(k => c.includes(k)));
+            const nomeCol = header.findIndex(c => NOME_KEYS.some(k => c.includes(k)));
+            const hasHeader = emailCol !== -1;
+
+            const contatos = [];
+            for (let i = hasHeader ? 1 : 0; i < rows.length; i++) {
+                const cols = splitRow(rows[i]);
+                let email, nome;
+                if (hasHeader) {
+                    email = cols[emailCol];
+                    nome = nomeCol !== -1 ? cols[nomeCol] : '';
+                } else if (cols.length >= 2) {
+                    const atIdx = cols.findIndex(c => c.includes('@'));
+                    email = atIdx !== -1 ? cols[atIdx] : cols[1];
+                    nome = atIdx === 0 ? cols[1] : cols[0];
+                } else {
+                    email = cols[0];
+                    nome = '';
+                }
+                if (email && email.includes('@') && !email.toLowerCase().includes('email')) {
+                    contatos.push(nome ? `${nome}, ${email}` : email);
+                }
+            }
+
             const textArea = document.getElementById('f_emails');
             const currentVal = textArea.value.trim();
-            
-            if(currentVal) textArea.value = currentVal + '\n' + validEmails.join('\n');
-            else textArea.value = validEmails.join('\n');
-            
+
+            if(currentVal) textArea.value = currentVal + '\n' + contatos.join('\n');
+            else textArea.value = contatos.join('\n');
+
             const total = document.getElementById('f_emails').value.split('\n').filter(e=>e.trim()).length;
             document.getElementById('emailCount').innerText = total;
-            app.showToast(`${validEmails.length} e-mails importados!`, "success");
+            app.showToast(`${contatos.length} contatos importados!`, "success");
         };
         reader.readAsText(input.files[0]);
     },
@@ -419,8 +469,9 @@ const app = {
             }
         }
         else if (app.currentView === 'grupos') {
-            body = { id, nome: document.getElementById('f_nome').value, emails: document.getElementById('f_emails').value.split('\n').map(e=>e.trim()).filter(e=>e.includes('@')) };
-        } 
+            const emails = document.getElementById('f_emails').value.split('\n').map(l=>l.trim()).filter(l=>l.includes('@')).map(parseContatoLine);
+            body = { id, nome: document.getElementById('f_nome').value, emails };
+        }
         else if (app.currentView === 'templates') {
             body = { id, nome: document.getElementById('f_nome').value, assunto: document.getElementById('f_assunto').value, html: document.getElementById('f_html').value };
         }
@@ -475,17 +526,21 @@ const app = {
         
         if(!smtpId) return app.showToast('Selecione um Servidor SMTP!', 'error');
 
-        let list = [];
-        if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = [...g.emails]; }
-        if(avulsos) list = [...list, ...avulsos.split('\n').filter(e=>e.trim().includes('@'))];
-        list = [...new Set(list)];
+        let list = []; // [{ email, nome }]
+        if(gid) { const g = app.data.grupos.find(x=>x.id==gid); if(g) list = (g.emails || []).map(normalizeContato); }
+        if(avulsos) {
+            const extras = avulsos.split('\n').map(l=>l.trim()).filter(l=>l.includes('@')).map(parseContatoLine);
+            list = [...list, ...extras];
+        }
+        const seen = new Set();
+        list = list.filter(c => { if(seen.has(c.email)) return false; seen.add(c.email); return true; });
 
         if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
         if(!confirm(`Enviar para ${list.length} pessoas?`)) return;
 
         const tmpl = app.data.templates.find(x=>x.id==tid);
-        const subj = tmpl ? tmpl.assunto : 'Aviso';
-        const html = tmpl ? tmpl.html : 'Olá';
+        const subjBase = tmpl ? tmpl.assunto : 'Aviso';
+        const htmlBase = tmpl ? tmpl.html : 'Olá';
 
         app.showToast(`Iniciando envio para ${list.length} contatos...`, 'success');
         const btn = document.getElementById('btnStart');
@@ -505,12 +560,15 @@ const app = {
             
             if(i > 0 && i % 50 === 0) app.showToast(`Enviados ${i} de ${list.length}...`, 'info');
 
-            await Promise.all(batch.map(async (email) => {
+            await Promise.all(batch.map(async (contato) => {
                 try {
+                    const vars = { nome: contato.nome || '', email: contato.email };
+                    const subject = mergeTemplate(subjBase, vars);
+                    const html = mergeTemplate(htmlBase, vars);
                     const res = await fetch('/api/send', {
-                        method:'POST', 
+                        method:'POST',
                         headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({email, subject:subj, html, smtpId})
+                        body:JSON.stringify({email: contato.email, subject, html, smtpId})
                     });
                     const data = await res.json();
                     

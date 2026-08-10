@@ -33,6 +33,35 @@ export const GET: APIRoute = async () => {
     await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS mailbox_resource_id TEXT`);
     await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS sender_name TEXT`);
 
+    // Tabelas usadas pelos Fluxos (automação) e pelo pixel de rastreamento de abertura.
+    // Faltavam aqui — sem elas, iniciar um fluxo ou abrir a aba Fluxos quebrava em banco novo.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS flow_tracking (
+        id SERIAL PRIMARY KEY,
+        flow_id INTEGER REFERENCES flows(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        current_step_index INTEGER DEFAULT 0,
+        next_execution_at TIMESTAMP DEFAULT NOW(),
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_flow_tracking_pending ON flow_tracking (status, next_execution_at);`);
+    await pool.query(`ALTER TABLE flow_tracking ADD COLUMN IF NOT EXISTS nome TEXT`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_logs (
+        id SERIAL PRIMARY KEY,
+        flow_id INTEGER REFERENCES flows(id) ON DELETE CASCADE,
+        step_index INTEGER,
+        email TEXT NOT NULL,
+        template_id INTEGER,
+        opened_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_flow_id ON email_logs (flow_id);`);
+
     return new Response("Banco de dados corrigido e atualizado com sucesso! 🚀 Tente salvar agora.");
   } catch (error: any) {
     return new Response("Erro no setup: " + error.message, { status: 500 });

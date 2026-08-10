@@ -3,6 +3,7 @@ import pool from "../../../lib/db";
 import nodemailer from "nodemailer";
 import { sendViaHostingerApi } from "../../../lib/hostingerMail";
 import { isValidSession, SESSION_COOKIE } from "../../../lib/auth";
+import { mergeTemplate } from "../../../lib/mailMerge";
 
 export const GET: APIRoute = async ({ request, cookies }) => {
   try {
@@ -68,6 +69,7 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
             if (templateRes.rows.length > 0) {
                 const tmpl = templateRes.rows[0];
+                const vars = { nome: task.nome || "", email: task.email };
 
                 // A. Cria Log de Envio para estatísticas
                 const logRes = await pool.query(
@@ -76,9 +78,10 @@ export const GET: APIRoute = async ({ request, cookies }) => {
                 );
                 const logId = logRes.rows[0].id;
 
-                // B. Injeta Pixel de Rastreamento (Imagem invisível)
+                // B. Personaliza (ex: {{nome}}) e injeta Pixel de Rastreamento (Imagem invisível)
                 const trackingPixel = `<img src="${siteUrl}/api/track?id=${logId}" width="1" height="1" style="display:none;" alt="" />`;
-                const finalHtml = tmpl.html + trackingPixel;
+                const finalSubject = mergeTemplate(tmpl.assunto, vars);
+                const finalHtml = mergeTemplate(tmpl.html, vars) + trackingPixel;
 
                 // C. Envia
                 if (isHostingerApi) {
@@ -86,7 +89,7 @@ export const GET: APIRoute = async ({ request, cookies }) => {
                         apiToken: config.api_token,
                         mailboxResourceId: config.mailbox_resource_id,
                         to: task.email,
-                        subject: tmpl.assunto,
+                        subject: finalSubject,
                         html: finalHtml,
                         displayName: senderName,
                     });
@@ -94,7 +97,7 @@ export const GET: APIRoute = async ({ request, cookies }) => {
                     await transporter!.sendMail({
                         from: `"${senderName}" <${config.sender_email || config.smtp_user}>`,
                         to: task.email,
-                        subject: tmpl.assunto,
+                        subject: finalSubject,
                         html: finalHtml
                     });
                 }
