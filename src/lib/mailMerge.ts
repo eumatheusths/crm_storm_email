@@ -4,5 +4,7 @@ export function mergeTemplate(text: string, vars: Record<string, string>): strin
   if (!text) return text;
   const lower: Record<string, string> = {};
   for (const key in vars) lower[key.toLowerCase()] = vars[key] ?? "";
+  // Templates em espanhol usam {{nombre}}; aceita como sinônimo de {{nome}}.
+  if (lower.nome !== undefined && lower.nombre === undefined) lower.nombre = lower.nome;
   return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => lower[key.toLowerCase()] ?? "");
 }
