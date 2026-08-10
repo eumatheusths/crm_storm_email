@@ -49,7 +49,7 @@ export const GET: APIRoute = async ({ request, cookies }) => {
         WHERE t.status = 'pending'
         AND t.next_execution_at <= NOW()
         AND f.active = true
-        LIMIT 20
+        LIMIT 15
     `);
 
     let processed = 0;
@@ -141,6 +141,10 @@ export const GET: APIRoute = async ({ request, cookies }) => {
                 await pool.query("UPDATE email_logs SET status = 'failed', error = $1 WHERE id = $2", [err.message, logId]).catch(() => {});
             }
         }
+
+        // Pausa entre cada envio — rajadas seguidas é o que costuma disparar o
+        // antispam do provedor de e-mail (já derrubou a caixa uma vez).
+        await new Promise((r) => setTimeout(r, 2000));
     }
 
     return new Response(JSON.stringify({ processed }));

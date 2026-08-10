@@ -8,10 +8,17 @@ function normalizeContato(item) {
 }
 
 // Uma linha "Nome, email@exemplo.com" -> {nome, email}. Sem vírgula, vira {nome:'', email: linha}.
+// Se colar algo com vírgula sobrando no fim (comum ao copiar de planilha), ela
+// vira parte do e-mail e a Hostinger rejeita o envio inteiro — por isso valida.
 function parseContatoLine(line) {
     const idx = line.indexOf(',');
-    if (idx === -1) return { nome: '', email: line.trim() };
-    return { nome: line.slice(0, idx).trim(), email: line.slice(idx + 1).trim() };
+    const raw = idx === -1 ? { nome: '', email: line.trim() } : { nome: line.slice(0, idx).trim(), email: line.slice(idx + 1).trim() };
+    return { nome: raw.nome, email: raw.email.replace(/[,;\s]+$/, '') };
+}
+
+const EMAIL_REGEX = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
+function isValidEmail(email) {
+    return EMAIL_REGEX.test(email);
 }
 
 const app = {
@@ -130,10 +137,25 @@ const app = {
                         <label>Template</label>
                         <select id="sendTemplate">${app.data.templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}</select>
                     </div>
+                    <div class="form-group">
+                        <label>Intervalo entre e-mails (segundos)</label>
+                        <input type="number" id="sendDelay" value="4" min="1" step="1">
+                        <small style="color:#666; font-size:11px;">Envio um por um, com essa pausa entre cada. Rajadas de vários ao mesmo tempo é o que costuma disparar bloqueio antispam do provedor de e-mail.</small>
+                    </div>
                     <button class="btn btn-primary" id="btnStart" onclick="window.app.startSending()">INICIAR DISPARO</button>
+
+                    <div id="sendProgressWrap" style="display:none; margin-top:20px; background:rgba(255,255,255,0.03); padding:14px; border-radius:10px;">
+                        <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; margin-bottom:8px;">
+                            <span id="sendProgressLabel">Enviando...</span>
+                            <span id="sendProgressCount">0/0</span>
+                        </div>
+                        <div style="height:8px; background:#333; border-radius:4px; overflow:hidden;">
+                            <div id="sendProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg, #723CEB, #A855F7); transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
                 </div>
             `;
-        } 
+        }
         // 2. TELA DE CONFIGURAÇÕES (Servidores de envio)
         else if (app.currentView === 'config') {
             if(!app.data.settings.length) html = '<div class="empty-state">Nenhum servidor configurado. Adicione um novo no painel ao lado.</div>';
@@ -418,7 +440,8 @@ const app = {
                     email = cols[0];
                     nome = '';
                 }
-                if (email && email.includes('@') && !email.toLowerCase().includes('email')) {
+                if (email) email = email.replace(/[,;\s]+$/, '');
+                if (email && isValidEmail(email) && !email.toLowerCase().includes('email')) {
                     contatos.push(nome ? `${nome}, ${email}` : email);
                 }
             }
@@ -511,7 +534,9 @@ const app = {
             }
         }
         else if (app.currentView === 'grupos') {
-            const emails = document.getElementById('f_emails').value.split('\n').map(l=>l.trim()).filter(l=>l.includes('@')).map(parseContatoLine);
+            const parsed = document.getElementById('f_emails').value.split('\n').map(l=>l.trim()).filter(l=>l.includes('@')).map(parseContatoLine);
+            const emails = parsed.filter(c => isValidEmail(c.email));
+            if (emails.length < parsed.length) app.showToast(`${parsed.length - emails.length} linha(s) com e-mail inválido foram ignoradas`, 'error');
             body = { id, nome: document.getElementById('f_nome').value, emails };
         }
         else if (app.currentView === 'templates') {
@@ -577,6 +602,10 @@ const app = {
         const seen = new Set();
         list = list.filter(c => { if(seen.has(c.email)) return false; seen.add(c.email); return true; });
 
+        const invalidCount = list.filter(c => !isValidEmail(c.email)).length;
+        list = list.filter(c => isValidEmail(c.email));
+        if (invalidCount > 0) app.showToast(`${invalidCount} contato(s) com e-mail inválido foram ignorados`, 'error');
+
         if(!list.length) return app.showToast('Sem e-mails para enviar', 'error');
         if(!confirm(`Enviar para ${list.length} pessoas?`)) return;
 
@@ -584,54 +613,61 @@ const app = {
         const subjBase = tmpl ? tmpl.assunto : 'Aviso';
         const htmlBase = tmpl ? tmpl.html : 'Olá';
 
-        app.showToast(`Iniciando envio para ${list.length} contatos...`, 'success');
+        const delaySeconds = Math.max(1, parseInt(document.getElementById('sendDelay').value) || 4);
+
         const btn = document.getElementById('btnStart');
-        btn.disabled = true; 
+        btn.disabled = true;
         btn.innerText = "ENVIANDO...";
-        
+
+        const progressWrap = document.getElementById('sendProgressWrap');
+        const progressBar = document.getElementById('sendProgressBar');
+        const progressCount = document.getElementById('sendProgressCount');
+        const progressLabel = document.getElementById('sendProgressLabel');
+        progressWrap.style.display = 'block';
+        progressLabel.innerText = 'Enviando...';
+
         let successCount = 0;
         let errorCount = 0;
         let lastError = "";
 
-        // --- CONFIGURAÇÃO SEGURA PARA OUTLOOK/TITAN ---
-        const BATCH_SIZE = 5; // Envia 5 emails de uma vez
-        const DELAY_MS = 2000; // Espera 2 segundos (segurança)
+        // Um e-mail por vez, com pausa entre cada um — rajadas de vários simultâneos
+        // é o que costuma disparar o antispam do provedor (já aconteceu aqui).
+        for (let i = 0; i < list.length; i++) {
+            const contato = list[i];
+            try {
+                const vars = { nome: contato.nome || '', email: contato.email };
+                const subject = mergeTemplate(subjBase, vars);
+                const html = mergeTemplate(htmlBase, vars);
+                const res = await fetch('/api/send', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({email: contato.email, subject, html, smtpId, templateId: tid || null})
+                });
+                const data = await res.json();
 
-        for(let i=0; i<list.length; i+=BATCH_SIZE) {
-            const batch = list.slice(i, i+BATCH_SIZE);
-            
-            if(i > 0 && i % 50 === 0) app.showToast(`Enviados ${i} de ${list.length}...`, 'info');
-
-            await Promise.all(batch.map(async (contato) => {
-                try {
-                    const vars = { nome: contato.nome || '', email: contato.email };
-                    const subject = mergeTemplate(subjBase, vars);
-                    const html = mergeTemplate(htmlBase, vars);
-                    const res = await fetch('/api/send', {
-                        method:'POST',
-                        headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({email: contato.email, subject, html, smtpId, templateId: tid || null})
-                    });
-                    const data = await res.json();
-                    
-                    if (res.ok) {
-                        successCount++;
-                    } else {
-                        errorCount++;
-                        lastError = data.error || "Erro desconhecido";
-                        console.error("Falha no envio:", lastError);
-                    }
-                } catch (err) {
+                if (res.ok) {
+                    successCount++;
+                } else {
                     errorCount++;
-                    lastError = "Erro de conexão";
-                    console.error(err);
+                    lastError = data.error || "Erro desconhecido";
+                    console.error("Falha no envio:", lastError);
                 }
-            }));
-            await new Promise(r=>setTimeout(r, DELAY_MS));
+            } catch (err) {
+                errorCount++;
+                lastError = "Erro de conexão";
+                console.error(err);
+            }
+
+            const done = i + 1;
+            progressBar.style.width = `${Math.round((done / list.length) * 100)}%`;
+            progressCount.innerText = `${done}/${list.length}`;
+
+            if (done < list.length) await new Promise(r=>setTimeout(r, delaySeconds * 1000));
         }
 
-        btn.disabled = false; 
+        btn.disabled = false;
         btn.innerText = "INICIAR DISPARO";
+        progressLabel.innerText = 'Concluído';
 
         if (errorCount > 0) {
             alert(`Fim com erros.\n✅ Sucesso: ${successCount}\n❌ Falhas: ${errorCount}\n\nMotivo da última falha: ${lastError}`);
